@@ -4,6 +4,13 @@ from abc import ABC, abstractmethod
 
 from src.core.agent_registry import AgentRegistry
 from src.core.distributed_state import DistributedStateManager
+from src.core.local_backend import (
+    LocalAgentRegistry,
+    LocalDistributedState,
+    LocalMessageBus,
+    LocalTaskQueue,
+    check_redis,
+)
 from src.core.message_bus import MessageBus
 from src.core.task_queue import CONSUMER_PREFIX, TaskQueue
 from src.core.telemetry import setup_observability
@@ -17,6 +24,7 @@ class BaseAgent(ABC):
         self.agent_type = agent_type
         self.capabilities = capabilities
         self.running = False
+        self._local_mode = False
 
         self.state_manager = DistributedStateManager()
         self.task_queue = TaskQueue()
@@ -25,21 +33,34 @@ class BaseAgent(ABC):
 
         setup_observability(project_name=agent_type)
 
-    async def start(self):
+    async def start(self, mode: str = "auto"):
         self.running = True
+
+        if mode == "local":
+            self._local_mode = True
+        elif mode == "auto":
+            self._local_mode = not await check_redis()
+        else:
+            self._local_mode = False
+
+        if self._local_mode:
+            self.state_manager = LocalDistributedState()
+            self.task_queue = LocalTaskQueue()
+            self.message_bus = LocalMessageBus()
+            self.registry = LocalAgentRegistry()
+            self.log("Local mode — Redis not available")
+
         await self.state_manager.connect()
         await self.task_queue.connect()
         await self.registry.register(self.agent_id, self.agent_type, self.capabilities)
         await self.registry.set_status(self.agent_id, "idle")
 
-        # Start background tasks
         asyncio.create_task(self._heartbeat_loop())
         asyncio.create_task(self._task_poll_loop())
         asyncio.create_task(self._message_listen_loop())
 
         await self.on_start()
 
-        # Listen for messages
         self.message_bus.subscribe(f"agent.{self.agent_id}", self._handle_direct_message)
         self.message_bus.subscribe("broadcast.all", self._handle_broadcast)
 

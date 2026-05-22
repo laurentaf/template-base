@@ -57,45 +57,32 @@ class LLMClient:
         start = time.time()
         last_error: str | None = None
 
-        # Try NIM Bridge first
-        if self.nim_key:
-            try:
-                resp = self.http.post(
-                    self.nim_url,
-                    headers={
-                        "Authorization": f"Bearer {self.nim_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=body,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    elapsed = (time.time() - start) * 1000
-                    choice = data["choices"][0]
-                    usage = data.get("usage", {})
-                    return LLMResponse(
-                        content=choice["message"]["content"],
-                        model=data.get("model", model),
-                        input_tokens=usage.get("prompt_tokens", 0),
-                        output_tokens=usage.get("completion_tokens", 0),
-                        latency_ms=round(elapsed, 1),
-                        provider="nim",
-                    )
-                last_error = f"NIM {resp.status_code}: {resp.text[:200]}"
-            except Exception as e:
-                last_error = f"NIM error: {e}"
+        providers = []
 
-        # Fallback to OpenRouter
+        if self.nim_key:
+            providers.append(("nim", self.nim_url, {"Authorization": f"Bearer {self.nim_key}"}))
+
         if self.openrouter_key:
-            try:
-                resp = self.http.post(
+            providers.append(
+                (
+                    "openrouter",
                     self.openrouter_url,
-                    headers={
+                    {
                         "Authorization": f"Bearer {self.openrouter_key}",
-                        "Content-Type": "application/json",
                         "HTTP-Referer": "https://github.com/laurentaf/template-base",
                     },
+                )
+            )
+
+        providers.append(("ollama", f"{settings.OLLAMA_URL}/chat/completions", {}))
+
+        for provider_name, url, headers in providers:
+            try:
+                resp = self.http.post(
+                    url,
+                    headers={"Content-Type": "application/json", **headers},
                     json=body,
+                    timeout=min(self.http.timeout, 120.0),
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -108,11 +95,11 @@ class LLMClient:
                         input_tokens=usage.get("prompt_tokens", 0),
                         output_tokens=usage.get("completion_tokens", 0),
                         latency_ms=round(elapsed, 1),
-                        provider="openrouter",
+                        provider=provider_name,
                     )
-                last_error = f"OpenRouter {resp.status_code}: {resp.text[:200]}"
+                last_error = f"{provider_name} {resp.status_code}: {resp.text[:200]}"
             except Exception as e:
-                last_error = f"OpenRouter error: {e}"
+                last_error = f"{provider_name} error: {e}"
 
         raise RuntimeError(f"LLM call failed: {last_error}")
 

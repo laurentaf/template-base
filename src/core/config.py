@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "ai-data-project"
     PHOENIX_URL: str = "http://localhost:6006"
     NIM_BRIDGE_URL: str = "http://localhost:8081/v1/chat/completions"
+    OLLAMA_URL: str = "http://localhost:11434/v1"
 
     # MCP Server URLs
     MCP_POSTGRES_URL: str | None = None
