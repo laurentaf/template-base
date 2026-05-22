@@ -1,6 +1,6 @@
-# SOTA AI Data Engineering Template
+# AI Data Engineering Template
 
-State-of-the-art template for **agentic data engineering projects** using the full AI-native stack: LangGraph, Prefect, DuckDB, PostgreSQL/pgvector, Qdrant, Arize Phoenix, and OpenCode.
+Template for **agentic data engineering projects** using the full AI-native stack: LangGraph, Prefect, DuckDB, PostgreSQL/pgvector, Qdrant, Arize Phoenix, and OpenCode.
 
 ## Quick Start
 
