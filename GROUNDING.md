@@ -5,7 +5,7 @@ taking any action. Every agent response must be grounded in this context.
 
 ## 1. Project Identity
 - **Name:** {{PROJECT_NAME}}
-- **Template:** sota-template-base v0.1
+- **Template:** LTADE template-base v0.1
 - **Stack:** Python 3.11, uv, DuckDB, Postgres/pgvector, Qdrant, Redis
 - **Orchestration:** Prefect, LangGraph
 

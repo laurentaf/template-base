@@ -28,7 +28,7 @@ uv run python src/core/harness.py
 Write-Host "[4/5] Initializing git repository..." -ForegroundColor Cyan
 git init
 git add .
-git commit -m "Initial commit: scaffold from SOTA AI Data Engineering template"
+git commit -m "Initial commit: scaffold from LTADE template"
 
 Write-Host "[5/5] Setup complete!" -ForegroundColor Green
 Write-Host ""

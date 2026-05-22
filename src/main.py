@@ -2,7 +2,7 @@ import os
 from src.core.telemetry import setup_observability
 from src.tools.database import get_duckdb_connection
 
-setup_observability("sota-data-engine")
+setup_observability("ltade-data-engine")
 
 def run_poc():
     con = get_duckdb_connection()

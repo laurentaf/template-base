@@ -1,7 +1,7 @@
 [project]
 name = "template-base"
 version = "0.1.0"
-description = "SOTA AI Data Engineering Template — Multi-Agent Pipelines, Analytics, and Agentic Workflows"
+description = "LTADE (Laurent Template AI Data Engineering) Template — Multi-Agent Pipelines, Analytics, and Agentic Workflows"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

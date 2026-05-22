@@ -1,9 +1,9 @@
 ---
 name: data-engineering
-description: Use when working on data pipelines, ETL/ELT, agentic data workflows, vector databases, or analytics with the SOTA AI Data Engineering stack (Prefect, LangGraph, DuckDB, Postgres, Qdrant, Phoenix).
+description: Use when working on data pipelines, ETL/ELT, agentic data workflows, vector databases, or analytics with the LTADE stack (Prefect, LangGraph, DuckDB, Postgres, Qdrant, Phoenix).
 ---
 
-# SOTA AI Data Engineering
+# LTADE: Laurent Template AI Data Engineering
 
 ## Infrastructure (Run First)
 

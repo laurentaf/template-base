@@ -22,7 +22,7 @@
 ## Architecture
 - **Pattern:** SDD-Harness with Medallion layers (Bronze → Silver → Gold)
 - **Agent workers:** 5 async agents communicating via Redis
-- **Multi-agent mode:** `docker compose up` or `sota-agents`
+- **Multi-agent mode:** `docker compose up` or `ltade-agents`
 
 ## Business Context
 [Describe the business domain, entities, and goals here]

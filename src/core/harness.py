@@ -47,5 +47,5 @@ class ProjectHarness:
         return {"status": status, "issues": issues, "timestamp": datetime.now().isoformat()}
 
 if __name__ == "__main__":
-    harness = ProjectHarness("sota-project")
+    harness = ProjectHarness("ltade-project")
     print(harness.check_health())
