@@ -57,12 +57,61 @@ Every project follows the **SDD-Harness** pattern:
 └── .env                   # Local env vars (gitignored)
 ```
 
+## Grounding Protocol (Mandatory)
+
+BEFORE taking any action, you MUST load and verify:
+
+1. **Read `GROUNDING.md`** — Project identity, available services, execution tier
+2. **Read `MEMORY.md`** — Current session state, blockers, next steps
+3. **Read `.opencode/context/registry.yaml`** — Find active project context
+4. **Load active context** — Read `.opencode/context/{active_project}/knowledge.md`
+5. **Read `spec/todo.md`** — Active task plan (if exists)
+6. **Read `spec/design.md`** — Architecture design (if exists)
+
+**KB-first cognition:** Check `docs/knowledge_base.md` and `.opencode/context/` for existing
+solutions before writing new code. Every response must be evidence-scored (cite your source).
+
 ## Workflow Protocol
 
 1. **Plan First** — Read `spec/design.md` and `MEMORY.md`. For any non-trivial task, write the plan to `spec/todo.md` first.
-2. **Track Progress** — Update `spec/todo.md` as items complete.
-3. **Handoff** — After EVERY task, update `MEMORY.md` with: current state, decisions, blockers, and next steps.
-4. **Capture Lessons** — After any user correction, append the pattern to `spec/lessons.md` and to `E:/projects/global-harness/knowledge/errors.md` if globally applicable.
+2. **Gate-aware** — Never start an SDD phase without the previous phase's gate passing.
+3. **Track Progress** — Update `spec/todo.md` as items complete.
+4. **Handoff** — After EVERY task, update `MEMORY.md` with: current state, decisions, blockers, and next steps.
+5. **Capture Lessons** — After any user correction, append the pattern to `spec/lessons.md` and to `E:/projects/global-harness/knowledge/errors.md` if globally applicable.
+6. **Cascade-aware iterate** — When updating a spec document, flag all downstream documents that need review.
+
+## SDD Workflow with Quality Gates
+
+Every feature follows 5 phases. Each phase has a mandatory quality gate.
+
+### Phase 0 — Brainstorm
+`spec/brainstorm/{feature}/BRAINSTORM.md`
+**Gate:** 3+ approaches, 3+ questions, YAGNI filter, success criteria
+**Validate:** `uv run python spec/quality_gates.py check --phase brainstorm --feature {feature}`
+
+### Phase 1 — Define
+`spec/define/{feature}/DEFINE.md`
+**Gate:** Clarity score >= 12/15
+**Validate:** `uv run python spec/quality_gates.py check --phase define --feature {feature}`
+
+### Phase 2 — Design
+`spec/design/{feature}/DESIGN.md`
+**Gate:** Complete file manifest, ADRs, schema, data flow
+**Validate:** `uv run python spec/quality_gates.py check --phase design --feature {feature}`
+
+### Phase 3 — Build
+Code in `src/` + `spec/build/{feature}/BUILD_REPORT.md`
+**Gate:** All tests pass, Ruff clean, no hardcoded secrets
+**Validate:** `uv run python spec/quality_gates.py check --phase build --feature {feature}`
+
+### Phase 4 — Ship
+`spec/archive/{feature}/SHIPPED.md`
+**Gate:** Validation score >= 90, lessons captured
+**Validate:** `uv run python spec/quality_gates.py validate --feature {feature}`
+
+### Cross-phase: Iterate
+When requirements change, update the relevant phase document and cascade-check
+downstream documents for staleness. Re-run gates on affected phases.
 
 ## Code Quality Rules
 

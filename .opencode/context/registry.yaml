@@ -1,0 +1,11 @@
+# Knowledge Context Registry
+# Active context is auto-injected into every agent session.
+# Switch between projects by changing `active_project`.
+
+active_project: default
+
+projects:
+  default:
+    path: .opencode/context/default
+    description: Default project context — customize for your project
+    last_updated: 2026-05-22

@@ -22,6 +22,8 @@ dependencies = [
     "redis[hiredis]>=5.2.0",
     "sqlalchemy>=2.0.0",
     "uvicorn>=0.46.0",
+    "typer>=0.15.0",
+    "rich>=13.9.0",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +32,7 @@ dev = [
     "ruff>=0.9.0",
     "mypy>=1.15.0",
     "pre-commit>=4.0.0",
-    "asynpg>=0.30.0",
+    "faker>=33.0.0",
 ]
 
 [project.scripts]
@@ -39,6 +41,8 @@ data-pipeline = "src.agents.data_pipeline_agent:main"
 analytics = "src.agents.analytics_agent:main"
 code-gen = "src.agents.code_gen_agent:main"
 reviewer = "src.agents.reviewer_agent:main"
+flowcheck = "cli.flowcheck:main"
+generate-data = "data.generators.ecommerce:generate_all"
 
 [tool.ruff]
 target-version = "py311"
