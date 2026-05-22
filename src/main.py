@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import typer
 
 from src.core.telemetry import setup_observability
@@ -192,6 +194,61 @@ def search(
     for r in results:
         typer.echo(f"[{r['score']:.3f}] {r['source']}")
         typer.echo(f"     {r['content'][:120]}...")
+
+
+@app.command()
+def sync(
+    project: str = typer.Argument(".", help="Project directory to sync"),
+    template: str = typer.Option(
+        "E:\\projects\\template-base", "--template", "-t", help="Template directory"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would change without applying"
+    ),
+):
+    """Sync project with latest template changes."""
+    from src.core.template_sync import sync_project
+
+    result = sync_project(
+        str(Path(project).resolve()), str(Path(template).resolve()), dry_run=dry_run
+    )
+
+    if not result["success"]:
+        typer.echo(f"Error: {result['error']}")
+        raise typer.Exit(1)
+
+    typer.echo(f"Template sync: {result['unchanged']} unchanged, {len(result['updated'])} updated")
+    if result["updated"]:
+        for f in result["updated"]:
+            typer.echo(f"  Updated: {f}")
+    if result["new"]:
+        typer.echo(f"  New files ({len(result['new'])}):")
+        for f in result["new"]:
+            typer.echo(f"    + {f}")
+    if result["conflicts"]:
+        typer.echo(f"  Conflicts ({len(result['conflicts'])}):")
+        for f in result["conflicts"]:
+            typer.echo(f"    ! {f}")
+    if result["removed"]:
+        typer.echo(f"  Removed from template ({len(result['removed'])}):")
+        for f in result["removed"]:
+            typer.echo(f"    - {f}")
+
+
+@app.command()
+def template_info(
+    project: str = typer.Option(".", "--project", "-p", help="Project directory"),
+    template: str = typer.Option(
+        "E:\\projects\\template-base", "--template", "-t", help="Template directory"
+    ),
+):
+    """Write .template-info.json for a project (used by ltade-new)."""
+    from src.core.template_sync import get_git_commit, save_template_info, scan_template
+
+    files = scan_template(template)
+    commit = get_git_commit(template)
+    save_template_info(str(Path(project).resolve()), template, commit, files)
+    typer.echo(f"Written .template-info.json ({len(files)} files tracked)")
 
 
 def main():

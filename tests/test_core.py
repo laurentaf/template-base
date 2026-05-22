@@ -335,6 +335,70 @@ class TestRag:
 
 
 # ---------------------------------------------------------------------------
+# Template Sync
+# ---------------------------------------------------------------------------
+
+from src.core.template_sync import (
+    load_template_info,
+    save_template_info,
+    scan_template,
+    sync_project,
+)
+
+
+class TestTemplateSync:
+    def test_scan_template(self, tmp_path):
+        d = tmp_path / "templ"
+        d.mkdir()
+        (d / "src").mkdir()
+        (d / "src" / "main.py").write_text("print('hello')")
+        (d / "src" / "__pycache__").mkdir()
+        (d / "src" / "__pycache__" / "ignored.pyc").write_text("x")
+        (d / ".venv").mkdir()
+        (d / ".venv" / "lib.py").write_text("x")
+        files = scan_template(str(d))
+        assert any("src" in k and "main.py" in k for k in files)
+        assert not any("__pycache__" in k for k in files)
+        assert not any(".venv" in k for k in files)
+
+    def test_save_and_load(self, tmp_path):
+        save_template_info(str(tmp_path), "test-source", "abc123", {"a.py": "hash1"})
+        info = load_template_info(str(tmp_path))
+        assert info is not None
+        assert info["source"] == "test-source"
+        assert info["commit"] == "abc123"
+        assert info["files"]["a.py"] == "hash1"
+
+    def test_sync_new_file(self, tmp_path):
+        t = tmp_path / "template"
+        p = tmp_path / "project"
+        t.mkdir()
+        p.mkdir()
+        (t / "new_file.py").write_text("x = 1")
+        save_template_info(str(p), str(t), "abc", scan_template(str(t)))
+        result = sync_project(str(p), str(t))
+        assert result["success"]
+        assert "new_file.py" in result["new"]
+
+    def test_sync_no_template_info(self, tmp_path):
+        p = tmp_path / "project"
+        p.mkdir()
+        result = sync_project(str(p), str(p))
+        assert not result["success"]
+
+    def test_dry_run_does_not_copy(self, tmp_path):
+        t = tmp_path / "template"
+        p = tmp_path / "project"
+        t.mkdir()
+        p.mkdir()
+        (t / "f.py").write_text("content")
+        save_template_info(str(p), str(t), "abc", scan_template(str(t)))
+        result = sync_project(str(p), str(t), dry_run=True)
+        assert "f.py" in result["new"]
+        assert not (p / "f.py").exists()
+
+
+# ---------------------------------------------------------------------------
 # LLM Client
 # ---------------------------------------------------------------------------
 
