@@ -1,27 +1,30 @@
+import asyncio
+
 from src.agents.base import BaseAgent
-from src.schemas.tasks import Task, TaskResult
 from src.schemas.messages import AgentMessage
+from src.schemas.tasks import Task, TaskResult
+
 
 class CodeGenAgent(BaseAgent):
     def __init__(self):
-        super().__init__("code-gen", [
-            "code_generation", "dbt_model", "sql_generation",
-            "pipeline_code", "scaffold"
-        ])
+        super().__init__(
+            "code-gen",
+            ["code_generation", "dbt_model", "sql_generation", "pipeline_code", "scaffold"],
+        )
 
     async def handle_task(self, task: Task) -> TaskResult:
         ttype = task.task_type
         payload = task.payload
 
         if ttype == "generate_dbt_model":
-            return await self._generate_dbt_model(payload)
+            return await self._generate_dbt_model(payload, task.task_id)
         if ttype == "generate_pipeline":
-            return await self._generate_pipeline(payload)
+            return await self._generate_pipeline(payload, task.task_id)
         if ttype == "generate_sql":
-            return await self._generate_sql(payload)
+            return await self._generate_sql(payload, task.task_id)
         return TaskResult(task_id=task.task_id, status="failed", error=f"Unknown: {ttype}")
 
-    async def _generate_dbt_model(self, payload: dict) -> TaskResult:
+    async def _generate_dbt_model(self, payload: dict, task_id: str) -> TaskResult:
         model_name = payload.get("name", "model")
         sql = payload.get("sql", "")
         materialized = payload.get("materialized", "view")
@@ -30,11 +33,15 @@ class CodeGenAgent(BaseAgent):
 
 {{{{ config(materialized='{materialized}') }}}}
 
-{'' if sql else '-- TODO: define SQL'}
+{"" if sql else "-- TODO: define SQL"}
 {sql}"""
-        return TaskResult(task_id=task.task_id, status="completed", output={"file": f"transform/models/{model_name}.sql", "content": model_code})
+        return TaskResult(
+            task_id=task_id,
+            status="completed",
+            output={"file": f"transform/models/{model_name}.sql", "content": model_code},
+        )
 
-    async def _generate_pipeline(self, payload: dict) -> TaskResult:
+    async def _generate_pipeline(self, payload: dict, task_id: str) -> TaskResult:
         name = payload.get("name", "pipeline")
         source = payload.get("source", "csv")
         target = payload.get("target", "postgres")
@@ -52,27 +59,32 @@ def run():
 if __name__ == "__main__":
     run()
 '''
-        return TaskResult(task_id=task.task_id, status="completed", output={
-            "file": f"src/pipelines/{name}.py", "content": code
-        })
+        return TaskResult(
+            task_id=task_id,
+            status="completed",
+            output={"file": f"src/pipelines/{name}.py", "content": code},
+        )
 
-    async def _generate_sql(self, payload: dict) -> TaskResult:
+    async def _generate_sql(self, payload: dict, task_id: str) -> TaskResult:
         description = payload.get("description", "")
         dialect = payload.get("dialect", "duckdb")
         sql = f"-- Auto-generated SQL ({dialect})\n-- Description: {description}\nSELECT 1;"
-        return TaskResult(task_id=task.task_id, status="completed", output={"sql": sql})
+        return TaskResult(task_id=task_id, status="completed", output={"sql": sql})
 
     async def on_message(self, msg: AgentMessage):
         if msg.topic == "generation.requested":
             self.log(f"Generation request from {msg.sender}: {msg.payload.get('type')}")
             # Auto-enqueue a self task
             payload = msg.payload
-            await self.enqueue_task(Task(
-                task_type=f"generate_{payload.get('type', 'pipeline')}",
-                agent_type="code-gen",
-                task_id=msg.correlation_id or msg.msg_id,
-                payload=payload
-            ))
+            await self.enqueue_task(
+                Task(
+                    task_type=f"generate_{payload.get('type', 'pipeline')}",
+                    agent_type="code-gen",
+                    task_id=msg.correlation_id or msg.msg_id,
+                    payload=payload,
+                )
+            )
+
 
 async def main():
     agent = CodeGenAgent()
@@ -83,6 +95,7 @@ async def main():
             await asyncio.sleep(1)
     except KeyboardInterrupt:
         await agent.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

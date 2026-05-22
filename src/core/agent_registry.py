@@ -1,16 +1,17 @@
-import json
 import asyncio
-import redis.asyncio as redis
-from typing import Any, Optional
+import json
 from datetime import datetime
+
+import redis.asyncio as redis
 
 HEARTBEAT_TTL = 30
 REGISTRY_KEY = "agent:registry"
 
+
 class AgentRegistry:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
 
     async def connect(self):
         if self._redis is None:
@@ -43,7 +44,7 @@ class AgentRegistry:
             data["status"] = status
             await self._redis.hset(REGISTRY_KEY, agent_id, json.dumps(data))
 
-    async def discover(self, capability: Optional[str] = None) -> list[dict]:
+    async def discover(self, capability: str | None = None) -> list[dict]:
         await self.connect()
         all_agents = await self._redis.hgetall(REGISTRY_KEY)
         result = []
@@ -60,7 +61,7 @@ class AgentRegistry:
             result.append(data)
         return result
 
-    async def find_idle(self, agent_type: str) -> Optional[dict]:
+    async def find_idle(self, agent_type: str) -> dict | None:
         agents = await self.discover()
         for a in agents:
             if a["agent_type"] == agent_type and a.get("status") == "idle":

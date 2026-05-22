@@ -1,15 +1,8 @@
 """
 Silver Layer — Cleansed & Enriched.
-
-Applies data quality rules, type casting, deduplication, and
-business-meaningful derivations. Every Silver table has at minimum:
-  - NOT NULL constraints on key fields
-  - Type casting to canonical types
-  - Deduplication by natural key
-  - Audit columns (_ingested_at, _source)
 """
+
 import duckdb
-from typing import Optional
 
 SILVER_DB = "data/silver.duckdb"
 BRONZE_DB = "data/bronze.duckdb"
@@ -22,6 +15,7 @@ QUALITY_RULES = {
     "valid_date": lambda col: f"try_strptime({col}, '%Y-%m-%d') IS NOT NULL OR {col} IS NULL",
 }
 
+
 def apply_quality_checks(con, table: str, checks: list[dict]) -> dict:
     results = {}
     for check in checks:
@@ -32,36 +26,47 @@ def apply_quality_checks(con, table: str, checks: list[dict]) -> dict:
             continue
         condition = sql_fn(col)
         if condition:
-            failed = con.execute(f"SELECT count(*) FROM {table} WHERE NOT ({condition})").fetchone()[0]
+            failed = con.execute(
+                f"SELECT count(*) FROM {table} WHERE NOT ({condition})"
+            ).fetchone()[0]
             results[f"{col}.{rule}"] = {"passed": failed == 0, "failed_rows": failed}
     return results
 
-def bronze_to_silver(source_table: str, target_table: str, quality_checks: Optional[list[dict]] = None) -> dict:
-    bronze_con = duckdb.connect(BRONZE_DB)
-    silver_con = duckdb.connect(SILVER_DB)
 
+def bronze_to_silver(
+    source_table: str,
+    target_table: str,
+    quality_checks: list[dict] | None = None,
+    db_path: str | None = None,
+    silver_path: str | None = None,
+) -> dict:
+    bronze_db = db_path or BRONZE_DB
+    silver_db = silver_path or SILVER_DB
+
+    bronze_con = duckdb.connect(bronze_db)
+    prefix = bronze_con.execute("SELECT current_database()").fetchone()[0]
+    df = bronze_con.execute(f"SELECT * FROM {prefix}.bronze.{source_table}").fetchdf()
+    bronze_con.close()
+
+    silver_con = duckdb.connect(silver_db)
     silver_con.execute("CREATE SCHEMA IF NOT EXISTS silver")
+    silver_con.execute(f"DROP TABLE IF EXISTS silver.{target_table}")
 
-    # Attach bronze DB for cross-DB query
-    bronze_con.execute(f"ATTACH '{SILVER_DB}' AS silver_db (TYPE duckdb)")
+    if len(df) > 0:
+        dedup_cols = [c for c in df.columns if c not in ("_ingested_at", "_source")]
+        df = df.drop_duplicates(subset=dedup_cols) if dedup_cols else df.drop_duplicates()
+        ts = duckdb.execute("SELECT current_timestamp").fetchone()[0]
+        df["_ingested_at"] = ts
+        df["_source"] = source_table
+        silver_con.execute(f"CREATE TABLE silver.{target_table} AS SELECT * FROM df")
+    else:
+        silver_con.execute(f"CREATE TABLE silver.{target_table} AS SELECT NULL LIMIT 0")
 
-    # Copy with dedup and audit columns
-    bronze_con.execute(f"""
-        CREATE OR REPLACE TABLE silver_db.silver.{target_table} AS
-        SELECT DISTINCT *,
-               current_timestamp AS _ingested_at,
-               '{source_table}' AS _source
-        FROM bronze.{source_table}
-        WHERE true
-    """)
-
-    count = bronze_con.execute(f"SELECT count(*) FROM silver_db.silver.{target_table}").fetchone()[0]
+    count = silver_con.execute(f"SELECT count(*) FROM silver.{target_table}").fetchone()[0]
 
     quality_results = {}
     if quality_checks:
         quality_results = apply_quality_checks(silver_con, f"silver.{target_table}", quality_checks)
 
-    bronze_con.close()
     silver_con.close()
-
     return {"table": target_table, "rows": count, "quality": quality_results}

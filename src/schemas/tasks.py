@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Any, Optional
-from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
+
 
 class Task(BaseModel):
     task_id: str
@@ -11,12 +12,14 @@ class Task(BaseModel):
     max_retries: int = 3
     depends_on: list[str] = []
 
+
 class TaskResult(BaseModel):
     task_id: str
     status: str  # completed, failed, skipped
-    output: Optional[Any] = None
-    error: Optional[str] = None
+    output: Any | None = None
+    error: str | None = None
     metrics: dict[str, Any] = {}
+
 
 class WorkflowDefinition(BaseModel):
     workflow_id: str

@@ -9,16 +9,20 @@ Usage:
     uv run python -m cli.flowcheck profile <table>
     uv run python -m cli.flowcheck quality <table>
 """
+
 import argparse
-import duckdb
 from pathlib import Path
 
+import duckdb
+
 DATA_DIR = Path("data")
+
 
 def fmt(val):
     if val is None:
         return "—"
     return str(val)
+
 
 def cmd_status(args):
     """Show health dashboard across all layers."""
@@ -38,11 +42,15 @@ def cmd_status(args):
             print(f"\n{name}: ❌ Not found")
             continue
         con = duckdb.connect(str(path))
-        tables = con.execute("SELECT table_name, table_schema FROM information_schema.tables WHERE table_type = 'BASE TABLE'").fetchall()
+        tables = con.execute(
+            "SELECT table_name, table_schema FROM information_schema.tables WHERE table_type = 'BASE TABLE'"
+        ).fetchall()
         print(f"\n{name}: ✅ ({path.stat().st_size / 1024:.1f} KB)")
         for t in tables:
             count = con.execute(f"SELECT count(*) FROM {t[1]}.{t[0]}").fetchone()[0]
-            cols = con.execute(f"SELECT count(*) FROM information_schema.columns WHERE table_name = '{t[0]}'").fetchone()[0]
+            cols = con.execute(
+                f"SELECT count(*) FROM information_schema.columns WHERE table_name = '{t[0]}'"
+            ).fetchone()[0]
             print(f"  {t[0]} ({t[1]}): {count} rows, {cols} columns")
         con.close()
 
@@ -50,7 +58,10 @@ def cmd_status(args):
     sample_dir = DATA_DIR / "sample"
     if sample_dir.exists():
         files = list(sample_dir.glob("*"))
-        print(f"\nSample data: {len(files)} files, {sum(f.stat().st_size for f in files) / 1024:.1f} KB")
+        print(
+            f"\nSample data: {len(files)} files, {sum(f.stat().st_size for f in files) / 1024:.1f} KB"
+        )
+
 
 def cmd_trace(args):
     """Trace a table through all Medallion layers."""
@@ -69,13 +80,16 @@ def cmd_trace(args):
         con = duckdb.connect(str(path))
         try:
             rows = con.execute(f"SELECT count(*) FROM {name.lower()}.{table}").fetchone()[0]
-            cols = con.execute(f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{name.lower()}'").fetchall()
+            cols = con.execute(
+                f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{name.lower()}'"
+            ).fetchall()
             print(f"{name}: ✅ {rows} rows")
             for col, dtype in cols:
                 print(f"  {col}: {dtype}")
         except Exception:
             print(f"{name}: ⚠️ Not found")
         con.close()
+
 
 def cmd_profile(args):
     """Profile a table — row count, nulls, distinct, min/max."""
@@ -87,17 +101,26 @@ def cmd_profile(args):
         return
     con = duckdb.connect(str(db_path))
     try:
-        cols = con.execute(f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'").fetchall()
+        cols = con.execute(
+            f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'"
+        ).fetchall()
         total_rows = con.execute(f"SELECT count(*) FROM {layer}.{table}").fetchone()[0]
         print(f"Table: {layer}.{table} — {total_rows} rows\n")
         for col, dtype in cols:
-            nulls = con.execute(f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL").fetchone()[0]
-            distinct = con.execute(f"SELECT count(DISTINCT {col}) FROM {layer}.{table}").fetchone()[0]
+            nulls = con.execute(
+                f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
+            ).fetchone()[0]
+            distinct = con.execute(f"SELECT count(DISTINCT {col}) FROM {layer}.{table}").fetchone()[
+                0
+            ]
             null_pct = round(nulls / total_rows * 100, 1) if total_rows else 0
-            print(f"  {col:25s} {dtype:15s} nulls: {nulls:>5d} ({null_pct:>4.1f}%) distinct: {distinct}")
+            print(
+                f"  {col:25s} {dtype:15s} nulls: {nulls:>5d} ({null_pct:>4.1f}%) distinct: {distinct}"
+            )
     except Exception as e:
         print(f"❌ Error: {e}")
     con.close()
+
 
 def cmd_quality(args):
     """Run data quality checks on a table."""
@@ -109,15 +132,17 @@ def cmd_quality(args):
         return
     con = duckdb.connect(str(db_path))
     try:
-        cols = con.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'").fetchall()
-        checks = [
-            ("not_null", c[0]) for c in cols
-        ]
+        cols = con.execute(
+            f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'"
+        ).fetchall()
+        checks = [("not_null", c[0]) for c in cols]
         print(f"Quality checks for {layer}.{table}:\n")
         passed = 0
         for rule, col in checks:
             try:
-                failed = con.execute(f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL").fetchone()[0]
+                failed = con.execute(
+                    f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
+                ).fetchone()[0]
                 ok = failed == 0
                 marker = "✅" if ok else "❌"
                 print(f"  {marker} {col} {rule} (failures: {failed})")
@@ -129,6 +154,7 @@ def cmd_quality(args):
     except Exception as e:
         print(f"❌ Error: {e}")
     con.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description="FlowCheck — Pipeline Debugging CLI")
@@ -156,6 +182,7 @@ def main():
         args.func(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,14 @@
 import json
+from collections.abc import Callable
+from typing import Optional
+
 import redis.asyncio as redis
-from typing import Any, Callable, Optional
+
 
 class MessageBus:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
         self._pubsub: Optional = None
         self._handlers: dict[str, list[Callable]] = {}
 

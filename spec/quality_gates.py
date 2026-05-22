@@ -5,6 +5,7 @@ Usage:
     uv run python spec/quality_gates.py check --phase brainstorm --feature my-feature
     uv run python spec/quality_gates.py validate --feature my-feature
 """
+
 import argparse
 import json
 import os
@@ -12,6 +13,7 @@ import sys
 from pathlib import Path
 
 SPEC_DIR = Path(__file__).parent
+
 
 def check_brainstorm_gate(feature: str) -> dict:
     doc_path = SPEC_DIR / "brainstorm" / feature / "BRAINSTORM.md"
@@ -27,6 +29,7 @@ def check_brainstorm_gate(feature: str) -> dict:
     passed = all(checks.values())
     return {"passed": passed, "checks": checks, "errors": [k for k, v in checks.items() if not v]}
 
+
 def check_define_gate(feature: str) -> dict:
     doc_path = SPEC_DIR / "define" / feature / "DEFINE.md"
     if not doc_path.exists():
@@ -38,7 +41,12 @@ def check_define_gate(feature: str) -> dict:
         if c in content.lower():
             score += 3
     passed = score >= 12
-    return {"passed": passed, "clarity_score": score, "errors": [] if passed else [f"Score {score}/15 < 12"]}
+    return {
+        "passed": passed,
+        "clarity_score": score,
+        "errors": [] if passed else [f"Score {score}/15 < 12"],
+    }
+
 
 def check_design_gate(feature: str) -> dict:
     doc_path = SPEC_DIR / "design" / feature / "DESIGN.md"
@@ -46,13 +54,15 @@ def check_design_gate(feature: str) -> dict:
         return {"passed": False, "errors": ["DESIGN.md not found"]}
     content = doc_path.read_text()
     checks = {
-        "file manifest present": "## File Manifest" in content or "file manifest" in content.lower(),
+        "file manifest present": "## File Manifest" in content
+        or "file manifest" in content.lower(),
         "ADRs documented": "adr" in content.lower(),
         "schema design present": "schema" in content.lower() or "## Schema" in content,
         "data flow diagram": "flow" in content.lower() or "data flow" in content.lower(),
     }
     passed = all(checks.values())
     return {"passed": passed, "checks": checks, "errors": [k for k, v in checks.items() if not v]}
+
 
 def check_build_gate(feature: str) -> dict:
     errors = []
@@ -63,6 +73,7 @@ def check_build_gate(feature: str) -> dict:
     if os.system("uv run pytest tests/ -q --tb=short") != 0:
         errors.append("Tests failed")
     return {"passed": len(errors) == 0, "errors": errors}
+
 
 def run_validation(feature: str) -> dict:
     results = {
@@ -80,15 +91,18 @@ def run_validation(feature: str) -> dict:
         "score": score,
         "passed": passed,
         "details": results,
-        "errors": [e for r in results.values() if isinstance(r, dict) for e in r.get("errors", [])]
+        "errors": [e for r in results.values() if isinstance(r, dict) for e in r.get("errors", [])],
     }
+
 
 def main():
     parser = argparse.ArgumentParser(description="SDD Quality Gate Validator")
     sub = parser.add_subparsers(dest="command")
 
     check_p = sub.add_parser("check")
-    check_p.add_argument("--phase", required=True, choices=["brainstorm", "define", "design", "build"])
+    check_p.add_argument(
+        "--phase", required=True, choices=["brainstorm", "define", "design", "build"]
+    )
     check_p.add_argument("--feature", required=True)
 
     validate_p = sub.add_parser("validate")
@@ -112,6 +126,7 @@ def main():
 
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("passed") else 1)
+
 
 if __name__ == "__main__":
     main()

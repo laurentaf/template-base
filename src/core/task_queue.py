@@ -1,15 +1,16 @@
 import json
+
 import redis.asyncio as redis
-from typing import Any, Optional
 
 STREAM_KEY = "task:queue"
 GROUP_NAME = "agents"
 CONSUMER_PREFIX = "worker"
 
+
 class TaskQueue:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
 
     async def connect(self):
         if self._redis is None:
@@ -25,13 +26,10 @@ class TaskQueue:
         msg_id = await self._redis.xadd(STREAM_KEY, {"data": entry}, maxlen=10000)
         return msg_id
 
-    async def dequeue(self, consumer_id: str, timeout: int = 5) -> Optional[dict]:
+    async def dequeue(self, consumer_id: str, timeout: int = 5) -> dict | None:
         await self.connect()
         results = await self._redis.xreadgroup(
-            GROUP_NAME, consumer_id,
-            {STREAM_KEY: ">"},
-            count=1,
-            block=timeout * 1000
+            GROUP_NAME, consumer_id, {STREAM_KEY: ">"}, count=1, block=timeout * 1000
         )
         if results:
             stream_name, messages = results[0]

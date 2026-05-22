@@ -1,18 +1,18 @@
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Optional
 
-from src.core.telemetry import setup_observability
-from src.core.distributed_state import DistributedStateManager
-from src.core.task_queue import TaskQueue
-from src.core.message_bus import MessageBus
 from src.core.agent_registry import AgentRegistry
-from src.schemas.tasks import Task, TaskResult
+from src.core.distributed_state import DistributedStateManager
+from src.core.message_bus import MessageBus
+from src.core.task_queue import CONSUMER_PREFIX, TaskQueue
+from src.core.telemetry import setup_observability
 from src.schemas.messages import AgentMessage
+from src.schemas.tasks import Task, TaskResult
+
 
 class BaseAgent(ABC):
-    def __init__(self, agent_type: str, capabilities: list[str], agent_id: Optional[str] = None):
+    def __init__(self, agent_type: str, capabilities: list[str], agent_id: str | None = None):
         self.agent_id = agent_id or f"{agent_type}-{uuid.uuid4().hex[:8]}"
         self.agent_type = agent_type
         self.capabilities = capabilities
@@ -63,19 +63,25 @@ class BaseAgent(ABC):
                     task_id=msg["msg_id"],
                     task_type=msg["type"],
                     agent_type=self.agent_type,
-                    payload=msg["payload"]
+                    payload=msg["payload"],
                 )
                 try:
                     result = await self.handle_task(task)
                     await self.task_queue.acknowledge(msg["msg_id"])
-                    await self.message_bus.publish("events.task.completed", {
-                        "task_id": task.task_id, "agent_id": self.agent_id, "result": result.model_dump()
-                    })
+                    await self.message_bus.publish(
+                        "events.task.completed",
+                        {
+                            "task_id": task.task_id,
+                            "agent_id": self.agent_id,
+                            "result": result.model_dump(),
+                        },
+                    )
                 except Exception as e:
                     await self.task_queue.nack(msg["msg_id"])
-                    await self.message_bus.publish("events.task.failed", {
-                        "task_id": task.task_id, "agent_id": self.agent_id, "error": str(e)
-                    })
+                    await self.message_bus.publish(
+                        "events.task.failed",
+                        {"task_id": task.task_id, "agent_id": self.agent_id, "error": str(e)},
+                    )
                 finally:
                     await self.registry.set_status(self.agent_id, "idle")
             await asyncio.sleep(0.5)
@@ -99,7 +105,9 @@ class BaseAgent(ABC):
         await self.message_bus.publish("broadcast.all", msg.model_dump())
 
     async def enqueue_task(self, task: Task) -> str:
-        return await self.task_queue.enqueue(task.task_type, task.payload | {"task_id": task.task_id}, task.priority)
+        return await self.task_queue.enqueue(
+            task.task_type, task.payload | {"task_id": task.task_id}, task.priority
+        )
 
     async def get_workflow_context(self, workflow_id: str) -> dict:
         state = await self.state_manager.get_state(f"workflow:{workflow_id}")
@@ -119,8 +127,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def handle_task(self, task: Task) -> TaskResult:
-        ...
+    async def handle_task(self, task: Task) -> TaskResult: ...
 
     def log(self, msg: str):
         print(f"[{self.agent_id}] {msg}")

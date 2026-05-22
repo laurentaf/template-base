@@ -1,47 +1,79 @@
 """
-Run the full Medallion pipeline: Bronze → Silver → Gold.
+Run the full Medallion pipeline: Bronze -> Silver -> Gold.
+Uses Prefect for orchestration with retry, logging, and observability.
 
 Usage:
     uv run python -m src.pipelines.medallion.run
 """
-from src.pipelines.medallion import bronze, silver, gold
+
+from prefect import flow, task
+
 from src.core.telemetry import setup_observability
+from src.pipelines.medallion import bronze, gold, silver
+
+
+@task(retries=2, retry_delay_seconds=5, log_prints=True)
+def ingest_bronze(data_dir: str) -> dict:
+    print(f"[Bronze] Ingesting from {data_dir}...")
+    results = bronze.ingest_all(data_dir)
+    for table, count in results.items():
+        print(f"  {table}: {count} rows")
+    return results
+
+
+@task(retries=1, retry_delay_seconds=3, log_prints=True)
+def transform_silver(tables: list[str]) -> dict:
+    print("[Silver] Applying quality checks and dedup...")
+    results = {}
+    for table in tables:
+        result = silver.bronze_to_silver(
+            table,
+            table,
+            quality_checks=[
+                {"column": "id", "rule": "not_null"},
+            ],
+        )
+        results[table] = result["rows"]
+        for check, status in result.get("quality", {}).items():
+            marker = "PASS" if status["passed"] else "FAIL"
+            print(f"  {table}.{check}: {marker} (failed: {status['failed_rows']})")
+    return results
+
+
+@task(log_prints=True)
+def build_gold() -> list[dict]:
+    print("[Gold] Building analytics views...")
+    results = gold.build_analytics_views()
+    for r in results:
+        print(f"  {r['view']}: {r['rows']} rows")
+    return results
+
+
+@flow(name="medallion-pipeline", log_prints=True)
+def run_medallion(data_dir: str = "data/sample"):
+    setup_observability("medallion-pipeline")
+    print("=" * 50)
+    print("Medallion Pipeline: Bronze -> Silver -> Gold")
+    print("=" * 50)
+
+    ingest_result = ingest_bronze(data_dir)
+    tables = list(ingest_result.keys())
+    if not tables:
+        print("No data found to process.")
+        return
+
+    silver_result = transform_silver(tables)
+    gold_result = build_gold()
+
+    print("\nPipeline complete")
+    print(f"  Bronze: data/bronze.duckdb — {len(ingest_result)} tables")
+    print(f"  Silver: data/silver.duckdb — {len(silver_result)} tables")
+    print(f"  Gold:   data/gold.duckdb   — {len(gold_result)} views")
+
 
 def run():
-    setup_observability("medallion-pipeline")
+    run_medallion()
 
-    print("=" * 50)
-    print("Medallion Pipeline: Bronze → Silver → Gold")
-    print("=" * 50)
-
-    # Phase 1: Bronze — Raw ingestion
-    print("\n[Bronze] Ingesting raw data...")
-    bronze_results = bronze.ingest_all()
-    for table, count in bronze_results.items():
-        print(f"  {table}: {count} rows")
-    tables = bronze.list_bronze_tables()
-
-    # Phase 2: Silver — Cleansed & enriched
-    print("\n[Silver] Applying quality checks...")
-    for table in tables:
-        result = silver.bronze_to_silver(table, table, quality_checks=[
-            {"column": "id", "rule": "not_null"},
-        ])
-        print(f"  {table}: {result['rows']} rows")
-        for check, status in result.get("quality", {}).items():
-            marker = "✅" if status["passed"] else "❌"
-            print(f"    {marker} {check} (failed: {status['failed_rows']})")
-
-    # Phase 3: Gold — Business analytics
-    print("\n[Gold] Building analytics views...")
-    gold_results = gold.build_analytics_views()
-    for r in gold_results:
-        print(f"  {r['view']}: {r['rows']} rows")
-
-    print("\n✅ Pipeline complete")
-    print(f"  Bronze: data/bronze.duckdb")
-    print(f"  Silver: data/silver.duckdb")
-    print(f"  Gold:   data/gold.duckdb")
 
 if __name__ == "__main__":
     run()

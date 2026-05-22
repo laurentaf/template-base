@@ -1,6 +1,7 @@
-import os
 import json
+import os
 from datetime import datetime
+
 
 class ProjectHarness:
     def __init__(self, project_name: str):
@@ -17,7 +18,7 @@ class ProjectHarness:
                 "last_deployment": None,
                 "active_specs": [],
                 "github_repo": None,
-                "health": "OK"
+                "health": "OK",
             }
             self._save_state(state)
 
@@ -26,14 +27,14 @@ class ProjectHarness:
             json.dump(state, f, indent=2)
 
     def register_spec(self, spec_name: str):
-        with open(self.state_file, "r") as f:
+        with open(self.state_file) as f:
             state = json.load(f)
         if spec_name not in state["active_specs"]:
             state["active_specs"].append(spec_name)
             self._save_state(state)
 
     def set_github_repo(self, repo_url: str):
-        with open(self.state_file, "r") as f:
+        with open(self.state_file) as f:
             state = json.load(f)
         state["github_repo"] = repo_url
         self._save_state(state)
@@ -45,6 +46,7 @@ class ProjectHarness:
             status = "DEGRADED"
             issues.append("Harness state file missing")
         return {"status": status, "issues": issues, "timestamp": datetime.now().isoformat()}
+
 
 if __name__ == "__main__":
     harness = ProjectHarness("ltade-project")

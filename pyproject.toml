@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "langgraph>=1.1.10",
+    "pandas>=2.0.0",
     "openinference-instrumentation-langchain>=0.1.63",
     "opentelemetry-exporter-otlp>=1.39.1",
     "opentelemetry-sdk>=1.39.1",

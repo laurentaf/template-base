@@ -1,12 +1,12 @@
 import json
+
 import redis.asyncio as redis
-from typing import Any, Optional
-from src.core.config import settings
+
 
 class DistributedStateManager:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
 
     async def connect(self):
         if self._redis is None:
@@ -17,18 +17,20 @@ class DistributedStateManager:
             await self._redis.close()
             self._redis = None
 
-    async def get_state(self, key: str) -> Optional[dict]:
+    async def get_state(self, key: str) -> dict | None:
         await self.connect()
         raw = await self._redis.get(f"state:{key}")
         return json.loads(raw) if raw else None
 
-    async def set_state(self, key: str, value: dict, version: Optional[int] = None):
+    async def set_state(self, key: str, value: dict, version: int | None = None):
         await self.connect()
         state_key = f"state:{key}"
         if version is not None:
             current = await self.get_state(key)
             if current and current.get("version", 0) != version:
-                raise ValueError(f"Version conflict for {key}: expected {version}, got {current.get('version', 0)}")
+                raise ValueError(
+                    f"Version conflict for {key}: expected {version}, got {current.get('version', 0)}"
+                )
             value["version"] = (current.get("version", 0) if current else 0) + 1
             async with self._redis.pipeline(transaction=True) as pipe:
                 await pipe.watch(state_key)
