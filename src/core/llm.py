@@ -128,6 +128,44 @@ class LLMClient:
         )
         return json.loads(resp.content)
 
+    def embed(self, text: str, model: str | None = None) -> list[float] | None:
+        body = {
+            "model": model or "nvidia/nv-embed-qa-4",
+            "input": text,
+        }
+        if self.nim_key:
+            try:
+                url = self.nim_url.replace("/chat/completions", "/embeddings")
+                resp = self.http.post(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self.nim_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=body,
+                )
+                if resp.status_code == 200:
+                    return resp.json()["data"][0]["embedding"]
+            except Exception:
+                pass
+        if self.openrouter_key:
+            try:
+                url = "https://openrouter.ai/api/v1/embeddings"
+                resp = self.http.post(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self.openrouter_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://github.com/laurentaf/template-base",
+                    },
+                    json=body,
+                )
+                if resp.status_code == 200:
+                    return resp.json()["data"][0]["embedding"]
+            except Exception:
+                pass
+        return None
+
     def close(self):
         self.http.close()
 

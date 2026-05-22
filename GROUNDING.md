@@ -6,7 +6,7 @@ taking any action. Every agent response must be grounded in this context.
 ## 1. Project Identity
 - **Name:** {{PROJECT_NAME}}
 - **Template:** LTADE template-base v0.1
-- **Stack:** Python 3.11, uv, DuckDB, Postgres/pgvector, Qdrant, Redis
+- **Stack:** Python 3.11, uv, DuckDB (VSS), Postgres, Redis, Prefect, LangGraph
 - **Orchestration:** Prefect, LangGraph
 
 ## 2. Active Documents (READ THESE FIRST)

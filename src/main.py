@@ -1,44 +1,39 @@
-"""
-LTADE — Laurent Template AI Data Engineering.
+import typer
 
-Usage:
-    uv run python src/main.py generate-data   # Generate synthetic data
-    uv run python src/main.py pipeline         # Run Medallion pipeline
-    uv run python src/main.py flowcheck        # Check pipeline status
-    uv run python src/main.py describe <table> # Describe dataset via AI
-"""
-
-import sys
-
-from src.core.harness import ProjectHarness
 from src.core.telemetry import setup_observability
 
+app = typer.Typer(help="LTADE — Laurent Template AI Data Engineering")
 setup_observability("ltade")
 
-harness = ProjectHarness("ltade")
 
-
-def cmd_generate():
+@app.command()
+def generate_data():
+    """Generate synthetic e-commerce data."""
     from data.generators.ecommerce import generate_all
 
     result = generate_all()
-    print(f"\nGenerated: {result}")
+    typer.echo(f"Generated: {result}")
 
 
-def cmd_pipeline():
+@app.command()
+def pipeline():
+    """Run the Medallion pipeline (Bronze → Silver → Gold)."""
     from src.pipelines.medallion.run import run_medallion
 
     run_medallion()
 
 
-def cmd_flowcheck():
-    from cli.flowcheck import main as flowcheck_main
+@app.command()
+def flowcheck():
+    """Check pipeline status."""
+    from cli.flowcheck import cmd_status
 
-    sys.argv = ["flowcheck", "status"]
-    flowcheck_main()
+    cmd_status(None)
 
 
-def cmd_describe(table: str):
+@app.command()
+def describe(table: str):
+    """Describe a dataset via AI."""
     import asyncio
 
     from src.agents.analytics_agent import AnalyticsAgent
@@ -57,20 +52,22 @@ def cmd_describe(table: str):
         )
         await agent.stop()
         if result.status == "completed":
-            print(f"\nDataset: {result.output['table']}")
-            print(f"Rows: {result.output['rows']}")
+            typer.echo(f"\nDataset: {result.output['table']}")
+            typer.echo(f"Rows: {result.output['rows']}")
             for col in result.output.get("columns", []):
-                print(
-                    f"  {col['column']:25s} {col['type']:15s} nulls:{col['nulls']:>5d}  distinct:{col['distinct']}"
-                )
-            print(f"\nAI Description:\n{result.output.get('description', 'N/A')}")
+                c, t = col["column"], col["type"]
+                n, d = col["nulls"], col["distinct"]
+                typer.echo(f"  {c:25s} {t:15s} nulls:{n:>5d}  distinct:{d}")
+            typer.echo(f"\nAI Description:\n{result.output.get('description', 'N/A')}")
         else:
-            print(f"Error: {result.error}")
+            typer.echo(f"Error: {result.error}")
 
     asyncio.run(run())
 
 
-def cmd_quality(table: str):
+@app.command()
+def quality(table: str):
+    """Run quality checks on a table."""
     from src.core.data_quality import DataQualityValidator, QualityCheck
 
     validator = DataQualityValidator("data/silver.duckdb")
@@ -79,29 +76,126 @@ def cmd_quality(table: str):
         QualityCheck(column="id", rule="unique"),
     ]
     results = validator.check_table(f"silver.{table}", checks)
-    print(validator.report(results))
+    typer.echo(validator.report(results))
     validator.close()
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return
+@app.group()
+def decision():
+    """Record, log, and manage architecture decisions."""
 
-    cmd = sys.argv[1]
-    if cmd == "generate-data":
-        cmd_generate()
-    elif cmd == "pipeline":
-        cmd_pipeline()
-    elif cmd == "flowcheck":
-        cmd_flowcheck()
-    elif cmd == "describe" and len(sys.argv) >= 3:
-        cmd_describe(sys.argv[2])
-    elif cmd == "quality" and len(sys.argv) >= 3:
-        cmd_quality(sys.argv[2])
-    else:
-        print(f"Unknown command: {cmd}")
-        print(__doc__)
+
+@decision.command()
+def add(
+    title: str = typer.Option(..., "--title", "-t", help="Decision title"),
+    context: str = typer.Option(..., "--context", "-c", help="Why this decision was needed"),
+    decision: str = typer.Option(..., "--decision", "-d", help="What was decided"),
+    consequences: str = typer.Option(..., "--consequences", "-q", help="Impact of the decision"),
+    phase: str = typer.Option("design", "--phase", "-p", help="SDD phase"),
+    author: str = typer.Option("user", "--author", "-a", help="Who made the decision"),
+    feature: str = typer.Option(None, "--feature", "-f", help="Feature name"),
+):
+    """Record a new architecture decision."""
+    from src.core.decision_log import DecisionLogStore
+    from src.schemas.decisions import DecisionLog
+
+    store = DecisionLogStore()
+    entry = DecisionLog(
+        id=store.next_id(),
+        title=title,
+        status="accepted",
+        context=context,
+        decision=decision,
+        consequences=consequences,
+        sdd_phase=phase,
+        author=author,
+        feature=feature,
+    )
+    store.add(entry)
+    typer.echo(f"✅ Recorded {entry.id}: {entry.title}")
+
+
+@decision.command()
+def log(
+    phase: str = typer.Option(None, "--phase", "-p", help="Filter by SDD phase"),
+    status: str = typer.Option(None, "--status", "-s", help="Filter by status"),
+    feature: str = typer.Option(None, "--feature", "-f", help="Filter by feature"),
+):
+    """List all architecture decisions."""
+    from src.core.decision_log import DecisionLogStore
+    from src.schemas.decisions import DecisionStatus
+
+    store = DecisionLogStore()
+    entries = store.all()
+    if phase:
+        entries = store.by_phase(phase)
+    if status:
+        entries = store.by_status(DecisionStatus(status))
+    if feature:
+        entries = store.by_feature(feature)
+
+    if not entries:
+        typer.echo("No decisions recorded yet.")
+        return
+    for e in entries:
+        typer.echo(f"[{e.id}] {e.title} ({e.status}) — {e.sdd_phase} — {e.date[:10]}")
+        typer.echo(f"     {e.decision[:80]}...")
+
+
+@decision.command()
+def status():
+    """Show decision log summary."""
+    from src.core.decision_log import DecisionLogStore
+
+    store = DecisionLogStore()
+    summary = store.status_summary()
+    typer.echo(f"Decisions: {summary['total']} total")
+    typer.echo(f"  Proposed:   {summary['proposed']}")
+    typer.echo(f"  Accepted:   {summary['accepted']}")
+    typer.echo(f"  Deprecated: {summary['deprecated']}")
+    typer.echo(f"  Superseded: {summary['superseded']}")
+    typer.echo(f"  File: {summary['file']}")
+
+
+@app.group()
+def rag():
+    """Ingest documents and search with RAG (DuckDB VSS)."""
+
+
+@rag.command()
+def ingest(
+    directory: str = typer.Argument(".", help="Directory to ingest"),
+    db: str = typer.Option("data/rag.duckdb", "--db", help="Output DuckDB path"),
+):
+    """Ingest documents into the RAG vector store."""
+    from src.rag.ingest import ingest_directory
+
+    result = ingest_directory(directory, db_path=db)
+    typer.echo(
+        f"Ingested {result['chunks']} chunks from {result['files']} files into {result['db']}"
+    )
+
+
+@rag.command()
+def search(
+    query: str = typer.Argument(..., help="Search query"),
+    db: str = typer.Option("data/rag.duckdb", "--db", help="DuckDB path"),
+    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results"),
+):
+    """Search the vector store."""
+    from src.rag.retrieve import search as rag_search
+
+    results = rag_search(query, db_path=db, top_k=top_k)
+    if not results:
+        typer.echo("No results found.")
+        return
+    for r in results:
+        typer.echo(f"[{r['score']:.3f}] {r['source']}")
+        typer.echo(f"     {r['content'][:120]}...")
+
+
+def main():
+    app()
 
 
 if __name__ == "__main__":

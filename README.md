@@ -57,12 +57,15 @@ The `data-engineer` agent will load automatically with full MCP server access.
 │   │   ├── config.py          # Pydantic settings (env-based)
 │   │   ├── harness.py         # SDD-Harness state manager
 │   │   ├── telemetry.py       # OpenTelemetry → Phoenix
-│   │   └── usage.py           # Token usage ledger (Postgres)
+│   │   ├── llm.py             # LLM client (NIM → OpenRouter)
+│   │   └── decision_log.py    # Structured decision tracking
 │   ├── agents/
 │   │   └── base.py            # Base agent class (ABC)
+│   ├── rag/
+│   │   ├── ingest.py          # DuckDB VSS document ingestion
+│   │   └── retrieve.py        # Semantic search retrieval
 │   └── tools/
-│       ├── database.py        # DuckDB, Postgres, Qdrant clients
-│       └── vector.py          # VectorStore wrapper
+│       └── database.py        # DuckDB + Postgres connection helpers
 ├── spec/
 │   ├── design.md              # Architecture spec (fill first)
 │   ├── todo.md                # Active task plan
@@ -87,8 +90,8 @@ The `data-engineer` agent will load automatically with full MCP server access.
 | Component | Technology | Port |
 |-----------|-----------|------|
 | Orchestration | Prefect, LangGraph | 4200 |
-| Relational DB | PostgreSQL 16 + pgvector | 5433 |
-| Vector DB | Qdrant | 6333/6334 |
+| Relational DB | PostgreSQL 16 | 5433 |
+| Vector Search | DuckDB VSS (local) | — |
 | Object Storage | MinIO | 9000/9001 |
 | Cache | Redis | 6379 |
 | Observability | Arize Phoenix | 6006 |
@@ -103,18 +106,25 @@ Configured in `opencode.json`:
 | Filesystem | Project file read/write |
 | GitHub | Repo management, PRs, issues |
 | Postgres | Direct database queries |
-| Qdrant | Vector search operations |
 | Docker | Container lifecycle |
 | Sequential Thinking | Complex reasoning chains |
+| Tavily | Web search for research |
+| Exa | Semantic web search |
+| Firecrawl | Web scraping |
+| Context7 | Dependency analysis |
 
 ## Commands
 
 ```powershell
-uv sync              # Install dependencies
-uv run pytest        # Run tests
-uv run ruff format . # Format code
-uv run ruff check .  # Lint
-uv run python src/main.py  # Run project
+uv sync                   # Install dependencies
+uv run pytest             # Run tests
+uv run ruff format .      # Format code
+uv run ruff check .       # Lint
+uv run ltade              # CLI help (typer-based)
+uv run ltade pipeline     # Run Medallion pipeline
+uv run ltade decision add --title "..."   # Record a decision
+uv run ltade rag ingest docs/ --db data/rag.duckdb  # Ingest docs for RAG
+uv run ltade rag search "query"           # Semantic search
 ```
 
 ## Deployment to GitHub

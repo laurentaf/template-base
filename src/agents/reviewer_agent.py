@@ -1,17 +1,24 @@
 import asyncio
 import os
+
 from src.agents.base import BaseAgent
-from src.schemas.tasks import Task, TaskResult
 from src.schemas.messages import AgentMessage
+from src.schemas.tasks import Task, TaskResult
 from src.tools.database import get_duckdb_connection, get_postgres_engine
 
 
 class ReviewerAgent(BaseAgent):
     def __init__(self):
-        super().__init__("reviewer", [
-            "code_review", "data_validation", "schema_validation",
-            "quality_check", "security_audit",
-        ])
+        super().__init__(
+            "reviewer",
+            [
+                "code_review",
+                "data_validation",
+                "schema_validation",
+                "quality_check",
+                "security_audit",
+            ],
+        )
 
     async def handle_task(self, task: Task) -> TaskResult:
         ttype = task.task_type
@@ -35,7 +42,11 @@ class ReviewerAgent(BaseAgent):
             issues.append({"severity": "warning", "message": "Use logging instead of print()"})
         if "password" in content.lower() or "secret" in content.lower():
             issues.append({"severity": "error", "message": "Hardcoded secret detected"})
-        if "api_key" in content.lower() and "os.environ" not in content and "os.getenv" not in content:
+        if (
+            "api_key" in content.lower()
+            and "os.environ" not in content
+            and "os.getenv" not in content
+        ):
             issues.append({"severity": "error", "message": "Use env vars for API keys"})
         if "except:" in content:
             issues.append({"severity": "warning", "message": "Bare except clause"})
@@ -51,7 +62,13 @@ class ReviewerAgent(BaseAgent):
         return TaskResult(
             task_id=task_id,
             status="completed" if passed else "failed",
-            output={"file": file_path, "issues": issues, "passed": passed, "total_issues": len(issues)},
+            output={
+                "file": file_path,
+                "issues": issues,
+                "passed": passed,
+                "total_issues": len(issues),
+            },
+        )
 
     async def _validate_schema(self, payload: dict, task_id: str) -> TaskResult:
         table = payload.get("table", "")
@@ -65,7 +82,8 @@ class ReviewerAgent(BaseAgent):
             if source == "duckdb":
                 con = get_duckdb_connection(db_path)
                 actual_cols = {
-                    r[0]: r[1] for r in con.execute(
+                    r[0]: r[1]
+                    for r in con.execute(
                         f"SELECT column_name, data_type FROM information_schema.columns "
                         f"WHERE table_name = '{table}' AND table_schema = '{layer}'"
                     ).fetchall()
@@ -94,10 +112,17 @@ class ReviewerAgent(BaseAgent):
                 issues.append({"severity": "error", "message": f"Type mismatch: {mismatch}"})
 
             passed = len([i for i in issues if i["severity"] == "error"]) == 0
-            return TaskResult(task_id=task_id, status="completed" if passed else "failed", output={
-                "table": table, "expected_cols": len(expected_schema),
-                "actual_cols": len(actual_cols), "issues": issues, "passed": passed,
-            })
+            return TaskResult(
+                task_id=task_id,
+                status="completed" if passed else "failed",
+                output={
+                    "table": table,
+                    "expected_cols": len(expected_schema),
+                    "actual_cols": len(actual_cols),
+                    "issues": issues,
+                    "passed": passed,
+                },
+            )
         except Exception as e:
             return TaskResult(task_id=task_id, status="failed", error=str(e))
 
@@ -114,17 +139,37 @@ class ReviewerAgent(BaseAgent):
                 f"WHERE table_name = '{table}' AND table_schema = '{layer}'"
             ).fetchall()
             for col, dtype in cols:
-                nulls = con.execute(f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL").fetchone()[0]
+                nulls = con.execute(
+                    f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
+                ).fetchone()[0]
                 if nulls == count:
-                    issues.append({"severity": "warning", "column": col, "message": "All values are NULL"})
-                unique = con.execute(f"SELECT count(DISTINCT {col}) FROM {layer}.{table}").fetchone()[0]
+                    issues.append(
+                        {"severity": "warning", "column": col, "message": "All values are NULL"}
+                    )
+                unique = con.execute(
+                    f"SELECT count(DISTINCT {col}) FROM {layer}.{table}"
+                ).fetchone()[0]
                 if unique == 1 and count > 1:
-                    issues.append({"severity": "info", "column": col, "message": "Only one distinct value — check if meaningful"})
+                    issues.append(
+                        {
+                            "severity": "info",
+                            "column": col,
+                            "message": "Only one distinct value — check if meaningful",
+                        }
+                    )
             con.close()
             passed = len([i for i in issues if i["severity"] == "error"]) == 0
-            return TaskResult(task_id=task_id, status="completed" if passed else "failed", output={
-                "table": table, "rows": count, "columns": len(cols), "issues": issues, "passed": passed,
-            })
+            return TaskResult(
+                task_id=task_id,
+                status="completed" if passed else "failed",
+                output={
+                    "table": table,
+                    "rows": count,
+                    "columns": len(cols),
+                    "issues": issues,
+                    "passed": passed,
+                },
+            )
         except Exception as e:
             return TaskResult(task_id=task_id, status="failed", error=str(e))
 
@@ -138,28 +183,51 @@ class ReviewerAgent(BaseAgent):
                 if f.endswith((".py", ".env", ".yml", ".yaml", ".json", ".toml")):
                     fp = os.path.join(root, f)
                     try:
-                        content = open(fp, "r", errors="ignore").read()
-                        if "password" in content.lower() and "os.environ" not in content and "os.getenv" not in content:
-                            findings.append({"file": fp, "severity": "error", "message": "Possible hardcoded password"})
+                        content = open(fp, errors="ignore").read()
+                        if (
+                            "password" in content.lower()
+                            and "os.environ" not in content
+                            and "os.getenv" not in content
+                        ):
+                            findings.append(
+                                {
+                                    "file": fp,
+                                    "severity": "error",
+                                    "message": "Possible hardcoded password",
+                                }
+                            )
                         if ".env" in f and "example" not in f.lower():
-                            findings.append({"file": fp, "severity": "warning", "message": ".env file tracked in repo"})
+                            findings.append(
+                                {
+                                    "file": fp,
+                                    "severity": "warning",
+                                    "message": ".env file tracked in repo",
+                                }
+                            )
                     except Exception:
                         pass
         passed = len([f for f in findings if f["severity"] == "error"]) == 0
-        return TaskResult(task_id=task_id, status="completed" if passed else "failed", output={
-            "status": "clean" if passed else "issues_found",
-            "findings": findings, "passed": passed,
-        })
+        return TaskResult(
+            task_id=task_id,
+            status="completed" if passed else "failed",
+            output={
+                "status": "clean" if passed else "issues_found",
+                "findings": findings,
+                "passed": passed,
+            },
+        )
 
     async def on_message(self, msg: AgentMessage):
         if msg.topic == "validation.requested":
             self.log(f"Validation request from {msg.sender}")
-            await self.enqueue_task(Task(
-                task_id=msg.correlation_id or msg.msg_id,
-                task_type="review_code",
-                agent_type="reviewer",
-                payload=msg.payload,
-            ))
+            await self.enqueue_task(
+                Task(
+                    task_id=msg.correlation_id or msg.msg_id,
+                    task_type="review_code",
+                    agent_type="reviewer",
+                    payload=msg.payload,
+                )
+            )
 
 
 async def main():
@@ -171,6 +239,7 @@ async def main():
             await asyncio.sleep(1)
     except KeyboardInterrupt:
         await agent.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

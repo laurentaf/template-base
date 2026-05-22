@@ -214,6 +214,127 @@ class TestFlowCheck:
 
 
 # ---------------------------------------------------------------------------
+# Decision Log
+# ---------------------------------------------------------------------------
+
+from src.core.decision_log import DecisionLogStore
+from src.schemas.decisions import DecisionLog, DecisionStatus
+
+
+class TestDecisionLog:
+    def test_add_and_all(self, tmp_path):
+        store = DecisionLogStore(str(tmp_path / "decisions.json"))
+        d = DecisionLog(
+            id="ADR-001",
+            title="Use DuckDB VSS",
+            status=DecisionStatus.accepted,
+            context="Need zero-infra vector search",
+            decision="Use DuckDB VSS extension instead of Qdrant",
+            consequences="Simpler setup for templates",
+            sdd_phase="design",
+            author="test",
+        )
+        store.add(d)
+        all_d = store.all()
+        assert len(all_d) == 1
+        assert all_d[0].title == "Use DuckDB VSS"
+
+    def test_next_id(self, tmp_path):
+        store = DecisionLogStore(str(tmp_path / "decisions.json"))
+        d = DecisionLog(
+            id=store.next_id(),
+            title="Test",
+            status=DecisionStatus.accepted,
+            context="x",
+            decision="y",
+            consequences="z",
+            sdd_phase="build",
+        )
+        store.add(d)
+        d2 = DecisionLog(
+            id=store.next_id(),
+            title="Test 2",
+            status=DecisionStatus.proposed,
+            context="x",
+            decision="y",
+            consequences="z",
+            sdd_phase="design",
+        )
+        store.add(d2)
+        assert d.id == "ADR-001"
+        assert d2.id == "ADR-002"
+
+    def test_by_phase(self, tmp_path):
+        store = DecisionLogStore(str(tmp_path / "decisions.json"))
+        for i, phase in enumerate(["brainstorm", "define", "design"]):
+            store.add(
+                DecisionLog(
+                    id=f"ADR-{i:03d}",
+                    title=f"Phase {phase}",
+                    status=DecisionStatus.accepted,
+                    context="x",
+                    decision="y",
+                    consequences="z",
+                    sdd_phase=phase,
+                )
+            )
+        assert len(store.by_phase("design")) == 1
+        assert len(store.by_phase("build")) == 0
+
+    def test_status_summary(self, tmp_path):
+        store = DecisionLogStore(str(tmp_path / "decisions.json"))
+        assert store.status_summary()["total"] == 0
+        store.add(
+            DecisionLog(
+                id="ADR-001",
+                title="T1",
+                status=DecisionStatus.accepted,
+                context="x",
+                decision="y",
+                consequences="z",
+                sdd_phase="build",
+            )
+        )
+        store.add(
+            DecisionLog(
+                id="ADR-002",
+                title="T2",
+                status=DecisionStatus.proposed,
+                context="x",
+                decision="y",
+                consequences="z",
+                sdd_phase="build",
+            )
+        )
+        summary = store.status_summary()
+        assert summary["total"] == 2
+        assert summary["accepted"] == 1
+        assert summary["proposed"] == 1
+
+
+# ---------------------------------------------------------------------------
+# RAG (DuckDB VSS)
+# ---------------------------------------------------------------------------
+
+
+class TestRag:
+    def test_chunk_text(self):
+        from src.rag.ingest import chunk_text
+
+        text = "a" * 2500
+        chunks = chunk_text(text, chunk_size=1000, overlap=100)
+        assert len(chunks) == 3
+        assert all(len(c) <= 1000 for c in chunks)
+
+    def test_chunk_small_text(self):
+        from src.rag.ingest import chunk_text
+
+        chunks = chunk_text("hello world", chunk_size=1000, overlap=100)
+        assert len(chunks) == 1
+        assert chunks[0] == "hello world"
+
+
+# ---------------------------------------------------------------------------
 # LLM Client
 # ---------------------------------------------------------------------------
 

@@ -6,9 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "arize-phoenix>=15.4.0",
-    "dbt-postgres>=1.10.0",
     "duckdb>=1.5.2",
-    "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "langgraph>=1.1.10",
     "pandas>=2.0.0",
@@ -19,10 +17,8 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.3",
     "pydantic-settings>=2.7.0",
-    "qdrant-client>=1.17.1",
     "redis[hiredis]>=5.2.0",
     "sqlalchemy>=2.0.0",
-    "uvicorn>=0.46.0",
     "typer>=0.15.0",
     "rich>=13.9.0",
 ]
@@ -42,8 +38,7 @@ data-pipeline = "src.agents.data_pipeline_agent:main"
 analytics = "src.agents.analytics_agent:main"
 code-gen = "src.agents.code_gen_agent:main"
 reviewer = "src.agents.reviewer_agent:main"
-flowcheck = "cli.flowcheck:main"
-generate-data = "data.generators.ecommerce:generate_all"
+ltade = "src.main:main"
 
 [tool.ruff]
 target-version = "py311"
