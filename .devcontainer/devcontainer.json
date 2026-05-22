@@ -1,0 +1,29 @@
+{
+  "name": "AI Data Engineering",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+  "postCreateCommand": "pip install uv && uv sync --dev",
+  "containerEnv": {
+    "DATABASE_URL": "postgresql+psycopg://prefect:password@localhost:5433/prefect",
+    "QDRANT_URL": "http://localhost:6333",
+    "PHOENIX_URL": "http://localhost:6006",
+    "PREFECT_API_URL": "http://localhost:4200/api"
+  },
+  "forwardPorts": [5433, 6333, 6006, 4200, 9000, 9001, 6379, 8081],
+  "runArgs": ["--network=host"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

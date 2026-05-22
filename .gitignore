@@ -1,0 +1,38 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# OpenCode local state
+.opencode/state/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Harness state
+.harness_state.json
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml

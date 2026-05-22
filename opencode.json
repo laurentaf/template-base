@@ -1,0 +1,77 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "data-engineer",
+  "instructions": ["MEMORY.md", "spec/design.md"],
+  "agent": {
+    "data-engineer": {
+      "description": "Primary AI Data Engineer agent for building data pipelines, agents, and analytics.",
+      "mode": "primary"
+    },
+    "reviewer": {
+      "description": "Code review specialist — checks for quality, security, and best practices.",
+      "mode": "subagent",
+      "permission": { "edit": "deny", "bash": "deny" }
+    }
+  },
+  "mcp": {
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "E:\\projects"],
+      "enabled": true
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "enabled": true,
+      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+    },
+    "postgres": {
+      "type": "local",
+      "command": ["npx", "-y", "@anthropic/mcp-server-postgres", "${DATABASE_URL}"],
+      "enabled": true
+    },
+    "qdrant": {
+      "type": "local",
+      "command": ["npx", "-y", "@qbraid/qdrant-mcp-server", "--url", "http://localhost:6333"],
+      "enabled": true
+    },
+    "docker": {
+      "type": "local",
+      "command": ["npx", "-y", "@anthropic/mcp-server-docker"],
+      "enabled": true
+    },
+    "memory-search": {
+      "type": "local",
+      "command": ["uv", "run", "python", "E:\\projects\\global-harness\\memory_mcp_server.py"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@anthropic/mcp-server-sequential-thinking"],
+      "enabled": true
+    }
+  },
+  "command": {
+    "deploy": {
+      "description": "Deploy the project — run docker-compose up, sync deps, and start services.",
+      "prompt": "Start the full infrastructure: run docker-compose -f E:/projects/infra/docker-compose.yml up -d, then uv sync, and verify services are healthy."
+    },
+    "test": {
+      "description": "Run the full test suite with pytest and linting.",
+      "prompt": "Run uv run pytest tests/ -v and uv run ruff check ."
+    },
+    "start-infra": {
+      "description": "Start the Silver Infrastructure (Docker services + global harness).",
+      "prompt": "Run docker-compose -f E:/projects/infra/docker-compose.yml up -d and E:/projects/global-harness/start_silver_infra.bat"
+    }
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": { "git *": "allow", "docker *": "allow", "uv *": "allow", "python *": "allow", "*": "ask" },
+    "external_directory": {
+      "E:\\projects\\**": "allow",
+      "C:\\Users\\Laurent\\.config\\opencode\\**": "allow",
+      "*": "ask"
+    }
+  }
+}
