@@ -1,7 +1,7 @@
 [project]
 name = "template-base"
 version = "0.1.0"
-description = "SOTA AI Data Engineering Template — Pipelines, Agents, Analytics"
+description = "SOTA AI Data Engineering Template — Multi-Agent Pipelines, Analytics, and Agentic Workflows"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -19,6 +19,7 @@ dependencies = [
     "pydantic>=2.13.3",
     "pydantic-settings>=2.7.0",
     "qdrant-client>=1.17.1",
+    "redis[hiredis]>=5.2.0",
     "sqlalchemy>=2.0.0",
     "uvicorn>=0.46.0",
 ]
@@ -29,7 +30,15 @@ dev = [
     "ruff>=0.9.0",
     "mypy>=1.15.0",
     "pre-commit>=4.0.0",
+    "asynpg>=0.30.0",
 ]
+
+[project.scripts]
+orchestrator = "src.agents.orchestrator:main"
+data-pipeline = "src.agents.data_pipeline_agent:main"
+analytics = "src.agents.analytics_agent:main"
+code-gen = "src.agents.code_gen_agent:main"
+reviewer = "src.agents.reviewer_agent:main"
 
 [tool.ruff]
 target-version = "py311"

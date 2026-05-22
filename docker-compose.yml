@@ -1,0 +1,88 @@
+services:
+  ### Shared Infrastructure
+  redis:
+    image: redis:7-alpine
+    container_name: agent-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  ### Multi-Agent Workers
+  orchestrator:
+    build: .
+    container_name: agent-orchestrator
+    restart: always
+    command: python -m src.agents.orchestrator
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AGENT_ROLE=orchestrator
+    volumes:
+      - ./src:/app/src
+      - ./.env:/app/.env
+
+  data-pipeline:
+    build: .
+    container_name: agent-data-pipeline
+    restart: always
+    command: python -m src.agents.data_pipeline_agent
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AGENT_ROLE=data-pipeline
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://prefect:password@host.docker.internal:5433/prefect}
+    volumes:
+      - ./src:/app/src
+      - ./.env:/app/.env
+
+  analytics:
+    build: .
+    container_name: agent-analytics
+    restart: always
+    command: python -m src.agents.analytics_agent
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AGENT_ROLE=analytics
+    volumes:
+      - ./src:/app/src
+
+  code-gen:
+    build: .
+    container_name: agent-code-gen
+    restart: always
+    command: python -m src.agents.code_gen_agent
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AGENT_ROLE=code-gen
+    volumes:
+      - ./src:/app/src
+      - ./transform:/app/transform
+
+  reviewer:
+    build: .
+    container_name: agent-reviewer
+    restart: always
+    command: python -m src.agents.reviewer_agent
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AGENT_ROLE=reviewer
+    volumes:
+      - ./src:/app/src

@@ -11,6 +11,22 @@
       "description": "Code review specialist — checks for quality, security, and best practices.",
       "mode": "subagent",
       "permission": { "edit": "deny", "bash": "deny" }
+    },
+    "orchestrator": {
+      "description": "Orchestrator agent — decomposes workflows into DAGs, dispatches to worker agents, aggregates results.",
+      "mode": "subagent"
+    },
+    "data-pipeline": {
+      "description": "Data pipeline worker — ETL/ELT, query execution, file ingestion, data transformation, validation.",
+      "mode": "subagent"
+    },
+    "analytics": {
+      "description": "Analytics worker — aggregations, anomaly detection, reporting, dashboard generation.",
+      "mode": "subagent"
+    },
+    "code-gen": {
+      "description": "Code generation worker — dbt models, pipeline code, SQL generation, scaffolding.",
+      "mode": "subagent"
     }
   },
   "mcp": {
