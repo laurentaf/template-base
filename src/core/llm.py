@@ -74,8 +74,6 @@ class LLMClient:
                 )
             )
 
-        providers.append(("ollama", f"{settings.OLLAMA_URL}/chat/completions", {}))
-
         for provider_name, url, headers in providers:
             try:
                 resp = self.http.post(
