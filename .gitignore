@@ -14,7 +14,8 @@ wheels/
 .env.local
 .env.production
 
-# OpenCode local state
+# OpenCode
+opencode.json
 .opencode/state/
 
 # IDE
