@@ -3,6 +3,9 @@ import uuid
 from abc import ABC, abstractmethod
 
 from src.core.agent_registry import AgentRegistry
+from src.core.auto_doc import auto_doc
+from src.core.auto_git import auto_git
+from src.core.confidence import ConfidenceReport, confidence_engine
 from src.core.distributed_state import DistributedStateManager
 from src.core.local_backend import (
     LocalAgentRegistry,
@@ -25,16 +28,38 @@ class BaseAgent(ABC):
         self.capabilities = capabilities
         self.running = False
         self._local_mode = False
+        self.pre_task_hooks: list = []
+        self.post_task_hooks: list = []
+        self._last_confidence_report: ConfidenceReport | None = None
 
         self.state_manager = DistributedStateManager()
         self.task_queue = TaskQueue()
         self.message_bus = MessageBus()
         self.registry = AgentRegistry()
 
-        setup_observability(project_name=agent_type)
+    def register_pre_hook(self, hook):
+        self.pre_task_hooks.append(hook)
+
+    def register_post_hook(self, hook):
+        self.post_task_hooks.append(hook)
+
+    async def evaluate_confidence(
+        self, task_description: str, task_type: str = "",
+    ) -> ConfidenceReport:
+        report = confidence_engine.evaluate(task_description, task_type)
+        self._last_confidence_report = report
+        return report
 
     async def start(self, mode: str = "auto"):
         self.running = True
+
+        try:
+            setup_observability(project_name=self.agent_type)
+        except Exception:
+            pass
+
+        self.post_task_hooks.append(lambda t, r, a: auto_doc.update_after_task(t, r, a))
+        self.post_task_hooks.append(lambda t, r, a: auto_git.auto_commit(t, r, a))
 
         if mode == "local":
             self._local_mode = True
@@ -86,26 +111,47 @@ class BaseAgent(ABC):
                     agent_type=self.agent_type,
                     payload=msg["payload"],
                 )
+            for hook in self.pre_task_hooks:
                 try:
-                    result = await self.handle_task(task)
-                    await self.task_queue.acknowledge(msg["msg_id"])
-                    await self.message_bus.publish(
-                        "events.task.completed",
-                        {
-                            "task_id": task.task_id,
-                            "agent_id": self.agent_id,
-                            "result": result.model_dump(),
-                        },
-                    )
-                except Exception as e:
-                    await self.task_queue.nack(msg["msg_id"])
-                    await self.message_bus.publish(
-                        "events.task.failed",
-                        {"task_id": task.task_id, "agent_id": self.agent_id, "error": str(e)},
-                    )
-                finally:
-                    await self.registry.set_status(self.agent_id, "idle")
+                    await hook(task) if asyncio.iscoroutinefunction(hook) else hook(task)
+                except Exception:
+                    pass
+            try:
+                result = await self.handle_task(task)
+                await self.task_queue.acknowledge(msg["msg_id"])
+                await self.message_bus.publish(
+                    "events.task.completed",
+                    {
+                        "task_id": task.task_id,
+                        "agent_id": self.agent_id,
+                        "result": result.model_dump(),
+                    },
+                )
+                await self._run_post_hooks(
+                    task.task_type, result.model_dump(), self.agent_type,
+                )
+            except Exception as e:
+                await self.task_queue.nack(msg["msg_id"])
+                await self.message_bus.publish(
+                    "events.task.failed",
+                    {"task_id": task.task_id, "agent_id": self.agent_id, "error": str(e)},
+                )
+                await self._run_post_hooks(
+                    task.task_type, {"error": str(e)}, self.agent_type,
+                )
+            finally:
+                await self.registry.set_status(self.agent_id, "idle")
             await asyncio.sleep(0.5)
+
+    async def _run_post_hooks(self, task_type, result_dict, agent_type):
+        for hook in self.post_task_hooks:
+            try:
+                if asyncio.iscoroutinefunction(hook):
+                    await hook(task_type, result_dict, agent_type)
+                else:
+                    hook(task_type, result_dict, agent_type)
+            except Exception:
+                pass
 
     async def _message_listen_loop(self):
         await self.message_bus.listen(["broadcast.all", f"agent.{self.agent_id}"])

@@ -4,10 +4,12 @@ from typing import Optional
 
 import redis.asyncio as redis
 
+from src.core.config import settings
+
 
 class MessageBus:
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        self.redis_url = redis_url or settings.REDIS_URL
         self._redis: redis.Redis | None = None
         self._pubsub: Optional = None
         self._handlers: dict[str, list[Callable]] = {}

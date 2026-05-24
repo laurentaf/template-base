@@ -219,6 +219,75 @@ As the primary data-engineer agent, you can:
 4. Retrieve results from distributed state
 5. Report back to the user
 
+## Confidence Protocol
+
+Every substantive action must pass through the confidence validation system before execution.
+
+### Decision Flow
+
+1. CLASSIFY → What type of task? What threshold?
+2. LOAD → Read KB patterns from `.opencode/kb/{domain}/`
+3. VALIDATE → Query MCP if KB insufficient
+4. CALCULATE → Base score + modifiers = final confidence
+5. DECIDE → confidence >= threshold? Execute/Research/Ask/Refuse
+
+### Agreement Matrix
+
+| | MCP AGREES | MCP DISAGREES | MCP SILENT |
+|---|---|---|---|
+| **KB HAS PATTERN** | HIGH: 0.95 → Execute | CONFLICT: 0.50 → Investigate | MEDIUM: 0.75 → Proceed |
+| **KB SILENT** | MCP-ONLY: 0.85 → Proceed | N/A | LOW: 0.50 → Research |
+
+### Confidence Modifiers
+
+| Condition | Modifier |
+|-----------|----------|
+| Fresh info (< 1 month) | +0.05 |
+| Stale info (> 6 months) | -0.05 |
+| Breaking change known | -0.15 |
+| Production examples exist | +0.05 |
+| No examples found | -0.05 |
+| Exact use case match | +0.05 |
+
+### Task Thresholds
+
+| Category | Threshold | Action If Below |
+|----------|-----------|-----------------|
+| CRITICAL (security, auth, secrets) | 0.98 | REFUSE + explain |
+| IMPORTANT (architecture, breaking changes) | 0.95 | ASK user first |
+| STANDARD (new features, refactoring) | 0.90 | RESEARCH then proceed |
+| ADVISORY (docs, formatting) | 0.80 | PROCEED freely |
+
+### Research Before Ask
+
+When confidence < threshold:
+1. Check KB domains (`.opencode/kb/`)
+2. Query MCP servers for validation
+3. Search internet if still uncertain
+4. Max 3 research rounds before asking user
+5. **Always present final plan to user before executing**
+
+## Consensus Workflow
+
+The agentic system supports 4 collaboration patterns:
+
+| Pattern | When | How |
+|---------|------|-----|
+| **CONSENSUS** | Architecture decisions, technology selection | Multiple agents vote, majority wins, quorum required |
+| **PARALLEL** | Batch validation, multi-source checks | Fan-out to N agents, gather all results |
+| **HIERARCHICAL** | Complex multi-phase workflows | Orchestrator delegates to sub-orchestrators |
+| **SEQUENTIAL** | Linear pipelines (default) | Chain of agents building on previous output |
+
+Agents communicate via Redis Streams + Pub/Sub. Orchestrator decomposes workflows and dispatches tasks with capability-based routing.
+
+### Self-Improvement Pattern
+
+- Agents track confidence scores per task type
+- Low-confidence tasks trigger research (KB → MCP → internet)
+- Research results are saved back to KB for future use
+- User is always asked to approve the final plan before execution
+- Only tasks with >= 98% confidence auto-execute without user input
+
 ## Verification Before Done
 
 - "Would a staff engineer approve this?"

@@ -12,26 +12,26 @@ except ImportError:
 
 
 def setup_observability(project_name=None):
-    """
-    Configures OpenTelemetry to send traces to Phoenix.
-    """
-    project_name = project_name or settings.PROJECT_NAME
-    endpoint = f"{settings.PHOENIX_URL}/v1/traces"
+    try:
+        from .config import settings as _settings
 
-    resource = Resource(attributes={"service.name": project_name})
+        project_name = project_name or _settings.PROJECT_NAME
+        endpoint = f"{_settings.PHOENIX_URL}/v1/traces"
+    except Exception:
+        project_name = project_name or "ltade"
+        endpoint = "http://localhost:6006/v1/traces"
 
-    tracer_provider = trace_sdk.TracerProvider(resource=resource)
-    span_exporter = OTLPSpanExporter(endpoint=endpoint)
-    span_processor = BatchSpanProcessor(span_exporter)
-    tracer_provider.add_span_processor(span_processor)
-
-    trace_api.set_tracer_provider(tracer_provider)
-
-    # Auto-instrument LangChain / LangGraph
-    LangChainInstrumentor().instrument()
-
-    print(f"✅ Observability Active! Project: {project_name}")
-    print(f"🔗 Dashboard: {settings.PHOENIX_URL}")
+    try:
+        resource = Resource(attributes={"service.name": project_name})
+        tracer_provider = trace_sdk.TracerProvider(resource=resource)
+        span_exporter = OTLPSpanExporter(endpoint=endpoint)
+        span_processor = BatchSpanProcessor(span_exporter)
+        tracer_provider.add_span_processor(span_processor)
+        trace_api.set_tracer_provider(tracer_provider)
+        LangChainInstrumentor().instrument()
+        print(f"Observability Active! Project: {project_name}")
+    except Exception:
+        print(f"Observability skipped — Phoenix not available at {endpoint}")
 
 
 def get_tracer(project_name: str = "ltade"):

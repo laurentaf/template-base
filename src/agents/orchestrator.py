@@ -23,6 +23,8 @@ class WorkflowState(TypedDict):
     failed: list[str]
     results: dict[str, Any]
     status: str
+    pattern: str
+    confidence_threshold: float
 
 
 class OrchestratorAgent(BaseAgent):
@@ -40,17 +42,33 @@ class OrchestratorAgent(BaseAgent):
                 f"Workflow: {state['name']}\n"
                 f"Description: {state['description']}\n"
                 f"Context: {json.dumps(state['context'])}\n\n"
-                "Decompose this work into sequential steps. Return a JSON array of "
-                'objects with keys: "step_id", "description", "agent_type" (one of: '
-                "data-pipeline, analytics, code-gen, reviewer)."
+                "Decompose this work into steps. Return a JSON object with keys:\n"
+                '"steps": an array of objects with keys: "step_id", "description", '
+                '"agent_type" (one of: data-pipeline, analytics, code-gen, reviewer), '
+                '"depends_on" (list of step_ids).\n'
+                '"pattern": one of "sequential", "parallel", "consensus", "hierarchical"\n'
+                '"confidence_threshold": a float between 0.0 and 1.0 indicating '
+                "the minimum confidence required to proceed automatically."
             )
             resp = llm.chat([{"role": "user", "content": prompt}])
             try:
                 data = json.loads(resp.content)
                 steps = data if isinstance(data, list) else data.get("steps", [])
-                return {"tasks": steps}
+                pattern = data.get("pattern", state.get("pattern", "sequential"))
+                confidence_threshold = data.get(
+                    "confidence_threshold", state.get("confidence_threshold", 0.90)
+                )
+                return {
+                    "tasks": steps,
+                    "pattern": pattern,
+                    "confidence_threshold": confidence_threshold,
+                }
             except json.JSONDecodeError:
-                return {"tasks": []}
+                return {
+                    "tasks": [],
+                    "pattern": state.get("pattern", "sequential"),
+                    "confidence_threshold": state.get("confidence_threshold", 0.90),
+                }
 
         async def dispatch(state: WorkflowState) -> dict:
             for t in state.get("tasks", []):
@@ -130,7 +148,15 @@ class OrchestratorAgent(BaseAgent):
             return await self._check_cluster_health()
         if task.task_type == "llm_chat":
             return await self._llm_chat(task)
+        if task.task_type == "plan_project":
+            return await self._plan_project(task)
         return TaskResult(task_id=task.task_id, status="failed", error=f"Unknown: {task.task_type}")
+
+    async def _plan_project(self, task: Task) -> TaskResult:
+        from src.core.planner import ProjectPlanner
+
+        await ProjectPlanner.plan(task.payload.get("description", ""), research=True)
+        return TaskResult(task_id=task.task_id, status="completed", output={"planned": True})
 
     async def _run_workflow(self, task: Task) -> TaskResult:
         workflow_id = task.payload.get("workflow_id", str(uuid.uuid4()))
@@ -144,6 +170,8 @@ class OrchestratorAgent(BaseAgent):
             "failed": [],
             "results": {},
             "status": "pending",
+            "pattern": task.payload.get("pattern", "sequential"),
+            "confidence_threshold": task.payload.get("confidence_threshold", 0.90),
         }
         await self.state_manager.set_state(f"workflow:{workflow_id}", {"status": "running"})
         config = {"configurable": {"thread_id": workflow_id}}

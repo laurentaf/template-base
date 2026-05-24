@@ -4,13 +4,15 @@ from datetime import datetime
 
 import redis.asyncio as redis
 
+from src.core.config import settings
+
 HEARTBEAT_TTL = 30
 REGISTRY_KEY = "agent:registry"
 
 
 class AgentRegistry:
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        self.redis_url = redis_url or settings.REDIS_URL
         self._redis: redis.Redis | None = None
 
     async def connect(self):

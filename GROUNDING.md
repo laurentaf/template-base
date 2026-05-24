@@ -4,7 +4,7 @@ This document defines the mandatory context that ALL agents must load before
 taking any action. Every agent response must be grounded in this context.
 
 ## 1. Project Identity
-- **Name:** {{PROJECT_NAME}}
+- **Name:** ai-data-project
 - **Template:** LTADE template-base v0.1
 - **Stack:** Python 3.11, uv, DuckDB (VSS), Postgres, Redis, Prefect, LangGraph
 - **Orchestration:** Prefect, LangGraph
@@ -37,8 +37,19 @@ taking any action. Every agent response must be grounded in this context.
 | MinIO | localhost:9000 | Web UI :9001 |
 
 ## 5. Execution Tier
-- **Current tier:** {{EXECUTION_TIER}} (development / staging / production)
+- **Current tier:** development (development / staging / production)
 - **Tier rules:**
   - Development: Full access, test data only
   - Staging: Read-only prod-like data, no destructive operations
   - Production: Read-only queries, no DDL, no DML without explicit approval
+
+## 6. Confidence Protocol
+
+All agents MUST evaluate confidence before executing substantive tasks:
+
+1. Classify task category (CRITICAL/IMPORTANT/STANDARD/ADVISORY)
+2. Calculate confidence using Agreement Matrix
+3. If below threshold: research (KB → MCP → internet) up to 3 rounds
+4. If still below: ask user with findings
+5. Always present plan for user approval before executing
+6. Only auto-execute without asking if confidence >= 98%

@@ -167,11 +167,14 @@ class LocalAgentRegistry:
         self._agents.pop(agent_id, None)
 
 
-async def check_redis(redis_url: str = "redis://localhost:6379", timeout: float = 2.0) -> bool:
+async def check_redis(redis_url: str | None = None, timeout: float = 2.0) -> bool:
+    from src.core.config import settings as _settings
+
+    url = redis_url or _settings.REDIS_URL
     try:
         import redis.asyncio as redis
 
-        r = await redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=timeout)
+        r = await redis.from_url(url, decode_responses=True, socket_connect_timeout=timeout)
         await r.ping()
         await r.close()
         return True

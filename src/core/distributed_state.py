@@ -2,10 +2,12 @@ import json
 
 import redis.asyncio as redis
 
+from src.core.config import settings
+
 
 class DistributedStateManager:
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        self.redis_url = redis_url or settings.REDIS_URL
         self._redis: redis.Redis | None = None
 
     async def connect(self):

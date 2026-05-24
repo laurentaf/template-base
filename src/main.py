@@ -2,10 +2,16 @@ from pathlib import Path
 
 import typer
 
-from src.core.telemetry import setup_observability
-
 app = typer.Typer(help="LTADE — Laurent Template AI Data Engineering")
-setup_observability("ltade")
+
+
+def _ensure_observability():
+    try:
+        from src.core.telemetry import setup_observability
+
+        setup_observability("ltade")
+    except Exception:
+        pass
 
 
 @app.command()
@@ -236,6 +242,77 @@ def sync(
 
 
 @app.command()
+def init(
+    project_name: str = typer.Option(None, "--name", "-n", help="Project name"),
+    tier: str = typer.Option("development", "--tier", "-t", help="Execution tier"),
+    skip_infra: bool = typer.Option(False, "--skip-infra", help="Skip infrastructure checks"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Accept defaults without prompts"),
+):
+    """Initialize project on first run (bootstrap)."""
+    import asyncio
+    from src.core.bootstrapper import BootstrapEngine
+
+    engine = BootstrapEngine(project_name=project_name, tier=tier, skip_infra=skip_infra, yes=yes)
+    asyncio.run(engine.run())
+
+
+@app.command()
+def health():
+    """Check health of all project services."""
+    import asyncio
+    from src.core.bootstrapper import HealthChecker
+
+    asyncio.run(HealthChecker.run_and_print())
+
+
+@app.group()
+def agents():
+    """Manage agent lifecycle (start/stop/status)."""
+
+
+@agents.command("start")
+def agents_start(
+    agent_types: str = typer.Option("all", "--types", "-t", help="Comma-separated agent types or 'all'"),
+    mode: str = typer.Option("auto", "--mode", "-m", help="auto, local, or distributed"),
+):
+    """Start agent workers."""
+    import asyncio
+    from src.core.bootstrapper import AgentManager
+
+    asyncio.run(AgentManager.start_agents(agent_types, mode))
+
+
+@agents.command("stop")
+def agents_stop():
+    """Stop all running agent workers."""
+    import asyncio
+    from src.core.bootstrapper import AgentManager
+
+    asyncio.run(AgentManager.stop_agents())
+
+
+@agents.command("status")
+def agents_status():
+    """Show status of all registered agents."""
+    import asyncio
+    from src.core.bootstrapper import AgentManager
+
+    asyncio.run(AgentManager.show_status())
+
+
+@app.command()
+def plan(
+    description: str = typer.Argument(..., help="Describe what this project does"),
+    research: bool = typer.Option(True, "--research/--no-research", help="Research before planning"),
+):
+    """Analyze project requirements and create execution plan."""
+    import asyncio
+    from src.core.planner import ProjectPlanner
+
+    asyncio.run(ProjectPlanner.plan(description, research=research))
+
+
+@app.command()
 def template_info(
     project: str = typer.Option(".", "--project", "-p", help="Project directory"),
     template: str = typer.Option(
@@ -252,6 +329,7 @@ def template_info(
 
 
 def main():
+    _ensure_observability()
     app()
 
 

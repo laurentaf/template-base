@@ -2,14 +2,16 @@ import json
 
 import redis.asyncio as redis
 
+from src.core.config import settings
+
 STREAM_KEY = "task:queue"
 GROUP_NAME = "agents"
 CONSUMER_PREFIX = "worker"
 
 
 class TaskQueue:
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        self.redis_url = redis_url or settings.REDIS_URL
         self._redis: redis.Redis | None = None
 
     async def connect(self):
@@ -45,6 +47,18 @@ class TaskQueue:
 
     async def nack(self, msg_id: str):
         await self.connect()
+        pending = await self._redis.xpending_range(
+            STREAM_KEY, GROUP_NAME, min=msg_id, max=msg_id, count=1
+        )
+        if pending:
+            consumer = pending[0]["consumer"]
+            await self._redis.xclaim(
+                STREAM_KEY, GROUP_NAME, consumer, 0, [msg_id]
+            )
+            entry_data = await self._redis.xrange(STREAM_KEY, min=msg_id, max=msg_id, count=1)
+            if entry_data:
+                _, fields = entry_data[0]
+                await self._redis.xadd(STREAM_KEY, fields, maxlen=10000)
         await self._redis.xack(STREAM_KEY, GROUP_NAME, msg_id)
 
     async def pending_count(self) -> int:
