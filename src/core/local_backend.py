@@ -90,11 +90,11 @@ class LocalDistributedState:
         state_key = f"state:{key}"
         async with self._lock:
             current = self._data.get(state_key)
-            if version is not None:
-                if current and current.get("version", 0) != version:
-                    raise ValueError(
-                        f"Version conflict for {key}: expected {version}, got {current.get('version', 0)}"
-                    )
+            if version is not None and current and current.get("version", 0) != version:
+                expected, got = version, current.get("version", 0)
+                raise ValueError(
+                    f"Version conflict for {key}: expected {expected}, got {got}"
+                )
             value["version"] = (current.get("version", 0) if current else 0) + 1
             self._data[state_key] = dict(value)
 

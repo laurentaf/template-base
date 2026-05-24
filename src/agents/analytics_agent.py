@@ -151,10 +151,13 @@ class AnalyticsAgent(BaseAgent):
                 f"Dataset: {layer}.{table}\n"
                 f"Total rows: {count}\n"
                 f"Columns:\n"
-                + "\n".join(
-                    f"  - {p['column']}: {p['type']} (nulls: {p['nulls']}, distinct: {p['distinct']})"
-                    for p in profiles
-                )
+        + "\n".join(
+            (
+                f" - {p['column']}: {p['type']}"
+                f" (nulls: {p['nulls']}, distinct: {p['distinct']})"
+            )
+            for p in profiles
+        )
                 + "\n\nDescribe this dataset: what each column likely represents, "
                 "data quality observations, and potential use cases."
             )

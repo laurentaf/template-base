@@ -475,6 +475,53 @@ def evolve_rollback(
         typer.echo("Nothing to rollback.")
 
 
+@evolve_app.command("daemon")
+def evolve_daemon(
+    interval: int = typer.Option(
+        300, "--interval", "-i", help="Seconds between harvest cycles"
+    ),
+    bg: bool = typer.Option(
+        False, "--bg", help="Run as background process"
+    ),
+    stop: bool = typer.Option(
+        False, "--stop", help="Stop background daemon"
+    ),
+    auto_apply: bool = typer.Option(
+        False, "--auto-apply", help="Auto-apply high-value learnings"
+    ),
+    template: str = typer.Option(
+        "E:\\projects\\template-base", "--template", "-t", help="Template path"
+    ),
+):
+    """Start/stop the periodic harvest daemon."""
+    from src.core.harvest_daemon import HarvestDaemon
+
+    if stop:
+        if HarvestDaemon.stop():
+            typer.echo("Daemon stopped.")
+        else:
+            typer.echo("No daemon running.")
+        return
+
+    if bg:
+        pid = HarvestDaemon.start_background(
+            interval=interval, template_path=template
+        )
+        typer.echo(f"Daemon started in background (PID: {pid})")
+        return
+
+    daemon = HarvestDaemon(
+        interval=interval,
+        auto_apply=auto_apply,
+        template_path=template,
+    )
+    typer.echo(
+        f"Starting daemon (interval={interval}s, auto_apply={auto_apply})"
+    )
+    typer.echo("Press Ctrl+C to stop.")
+    daemon.start()
+
+
 def main():
     _ensure_observability()
     app()

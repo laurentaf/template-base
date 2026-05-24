@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     EVOLVE_AUTO_APPLY: bool = False
     EVOLVE_MIN_CONFIDENCE: float = 0.7
     LEARNING_EMIT_ENABLED: bool = True
+    EVOLVE_DAEMON_INTERVAL: int = 300
+    EVOLVE_DAEMON_AUTO_ANALYZE: bool = True
+    EVOLVE_DAEMON_AUTO_APPLY: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

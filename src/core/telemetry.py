@@ -8,7 +8,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 try:
     from .config import settings
 except ImportError:
-    import config as settings  # Fallback for flat structure
+    settings = None  # type: ignore[assignment]
 
 
 def setup_observability(project_name=None):

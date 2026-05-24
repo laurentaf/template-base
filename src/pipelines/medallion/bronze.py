@@ -22,7 +22,8 @@ def ingest_csv(table_name: str, file_path: str, db_path: str = BRONZE_DB) -> int
     con.execute("CREATE SCHEMA IF NOT EXISTS bronze")
     prefix = _schema_prefix(con)
     con.execute(
-        f"CREATE OR REPLACE TABLE {prefix}.{table_name} AS SELECT * FROM read_csv_auto('{file_path}')"
+        f"CREATE OR REPLACE TABLE {prefix}.{table_name} "
+        f"AS SELECT * FROM read_csv_auto('{file_path}')"
     )
     count = con.execute(f"SELECT count(*) FROM {prefix}.{table_name}").fetchone()[0]
     con.close()
@@ -34,7 +35,8 @@ def ingest_json(table_name: str, file_path: str, db_path: str = BRONZE_DB) -> in
     con.execute("CREATE SCHEMA IF NOT EXISTS bronze")
     prefix = _schema_prefix(con)
     con.execute(
-        f"CREATE OR REPLACE TABLE {prefix}.{table_name} AS SELECT * FROM read_json_auto('{file_path}')"
+        f"CREATE OR REPLACE TABLE {prefix}.{table_name} "
+        f"AS SELECT * FROM read_json_auto('{file_path}')"
     )
     count = con.execute(f"SELECT count(*) FROM {prefix}.{table_name}").fetchone()[0]
     con.close()
