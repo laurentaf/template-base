@@ -6,7 +6,9 @@ from src.core.agent_registry import AgentRegistry
 from src.core.auto_doc import auto_doc
 from src.core.auto_git import auto_git
 from src.core.confidence import ConfidenceReport, confidence_engine
+from src.core.config import settings
 from src.core.distributed_state import DistributedStateManager
+from src.core.learnings import learning_emitter
 from src.core.local_backend import (
     LocalAgentRegistry,
     LocalDistributedState,
@@ -58,8 +60,17 @@ class BaseAgent(ABC):
         except Exception:
             pass
 
-        self.post_task_hooks.append(lambda t, r, a: auto_doc.update_after_task(t, r, a))
-        self.post_task_hooks.append(lambda t, r, a: auto_git.auto_commit(t, r, a))
+        self.post_task_hooks.append(
+            lambda t, r, a: auto_doc.update_after_task(t, r, a)
+        )
+        self.post_task_hooks.append(
+            lambda t, r, a: auto_git.auto_commit(t, r, a)
+        )
+        self.post_task_hooks.append(
+            lambda t, r, a: learning_emitter.emit_from_task_result(
+                t, r, a, project_name=settings.PROJECT_NAME,
+            )
+        )
 
         if mode == "local":
             self._local_mode = True

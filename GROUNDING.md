@@ -53,3 +53,40 @@ All agents MUST evaluate confidence before executing substantive tasks:
 4. If still below: ask user with findings
 5. Always present plan for user approval before executing
 6. Only auto-execute without asking if confidence >= 98%
+
+## 7. Self-Evolve Protocol
+
+The system learns from every project and feeds improvements back to the template:
+
+### Learning Loop
+```
+Project A discovers pattern
+  → .learnings/ emits learning (auto on every task)
+  → Global EvolveEngine harvests periodically
+  → Template KB/agents/config improve
+  → Project B starts with better defaults
+```
+
+### What Gets Evolved
+| Learning Category | Evolve Target | Example |
+|---|---|---|
+| `kb_insight` | `.opencode/kb/{domain}/concepts/` | New DuckDB pattern article |
+| `agent_improvement` | `.opencode/agents/*.md` | Reviewer learns SQL injection check |
+| `config_tuning` | `src/core/config.py` defaults | Better Redis URL pattern |
+| `pattern_discovered` | `.opencode/kb/{domain}/patterns/` | Reusable medallion pattern |
+| `error_resolution` | `.opencode/kb/{domain}/concepts/error-catalog.md` | Telemetry crash fix |
+| `workflow_optimization` | Orchestrator/consensus defaults | Parallel dispatch tuning |
+
+### Commands
+- `ltade evolve discover` — Find projects with .learnings/
+- `ltade evolve harvest` — Pull learnings from all projects
+- `ltade evolve analyze` — Rank learnings by value
+- `ltade evolve apply` — Write improvements to template
+- `ltade evolve rollback` — Undo last apply
+- `ltade evolve status` — Show evolve state
+
+### Rules
+- Only **active** (in-progress) projects emit learnings; done projects are skipped
+- Learnings require confidence >= 0.7 to be auto-applied
+- All applies are backed up for rollback
+- `EVOLVE_AUTO_APPLY=false` by default — user must explicitly run `ltade evolve apply`

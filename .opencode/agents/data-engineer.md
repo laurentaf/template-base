@@ -288,6 +288,43 @@ Agents communicate via Redis Streams + Pub/Sub. Orchestrator decomposes workflow
 - User is always asked to approve the final plan before execution
 - Only tasks with >= 98% confidence auto-execute without user input
 
+## Self-Evolve Protocol
+
+Every project auto-emits learnings to `.learnings/` on task completion.
+The global EvolveEngine harvests these and improves the template for future projects.
+
+### How It Works
+1. **Emit** — Every task result automatically generates a learning (if noteworthy)
+2. **Harvest** — `ltade evolve harvest` pulls learnings from all active projects
+3. **Analyze** — Learnings are ranked by confidence and frequency
+4. **Apply** — High-value learnings become KB articles, agent improvements, config fixes
+5. **Rollback** — Every change is backed up; `ltade evolve rollback` undoes it
+
+### What Agents Should Do
+- After resolving an error: emit `error_resolution` learning
+- After discovering a pattern: emit `pattern_discovered` learning
+- After improving a workflow: emit `workflow_optimization` learning
+- These happen automatically via post-task hooks, but you can also emit manually:
+
+```python
+from src.core.learnings import learning_emitter, LearningCategory
+learning_emitter.emit(
+    category=LearningCategory.KB_INSIGHT,
+    domain="duckdb",
+    title="VSS requires float32 embeddings",
+    body="DuckDB VSS index creation fails with float64. Cast to float32 first.",
+    confidence=0.9,
+)
+```
+
+### Global Commands
+- `ltade evolve discover` — Find all projects with learnings
+- `ltade evolve harvest` — Pull learnings from active projects
+- `ltade evolve analyze` — Show high-value learnings
+- `ltade evolve apply` — Apply improvements to template-base
+- `ltade evolve rollback` — Undo last apply
+- `ltade evolve status` — Show overall evolve state
+
 ## Verification Before Done
 
 - "Would a staff engineer approve this?"

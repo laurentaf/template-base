@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     CONFIDENCE_THRESHOLD_STANDARD: float = 0.90
     CONFIDENCE_THRESHOLD_ADVISORY: float = 0.80
     MAX_CONFIDENCE_RESEARCH_ROUNDS: int = 3
+    EVOLVE_ENABLED: bool = True
+    EVOLVE_TEMPLATE_PATH: str = "E:\\projects\\template-base"
+    EVOLVE_AUTO_APPLY: bool = False
+    EVOLVE_MIN_CONFIDENCE: float = 0.7
+    LEARNING_EMIT_ENABLED: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
