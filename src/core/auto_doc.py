@@ -59,6 +59,7 @@ class AutoDoc:
         last_updated = f"last_updated: {datetime.now().strftime('%Y-%m-%d')}"
         if "last_updated:" in content:
             import re
+
             content = re.sub(r"last_updated: \d{4}-\d{2}-\d{2}", last_updated, content)
         else:
             content += f"\n\n{last_updated}\n"
@@ -74,9 +75,9 @@ class AutoDoc:
         content = arch_path.read_text(encoding="utf-8")
         if "## Component Map" in content and "[Describe" in content:
             table_header = (
-            "| Component | Responsibility | Technology |\n"
-            "|-----------|---------------|------------|\n"
-        )
+                "| Component | Responsibility | Technology |\n"
+                "|-----------|---------------|------------|\n"
+            )
             table_row = f"| {component} | {description} | {technology} |\n"
             content = content.replace(
                 "[Describe the main components and their relationships]",

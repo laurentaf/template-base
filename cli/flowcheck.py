@@ -15,6 +15,8 @@ from pathlib import Path
 
 import duckdb
 
+from src.tools.database import safe_column, safe_layer, safe_table
+
 DATA_DIR = Path("data")
 
 
@@ -25,7 +27,6 @@ def fmt(val):
 
 
 def cmd_status(args):
-    """Show health dashboard across all layers."""
     print("=" * 60)
     print("FlowCheck — Pipeline Health Dashboard")
     print("=" * 60)
@@ -43,28 +44,29 @@ def cmd_status(args):
             continue
         con = duckdb.connect(str(path))
         tables = con.execute(
-            "SELECT table_name, table_schema FROM information_schema.tables WHERE table_type = 'BASE TABLE'"
+            "SELECT table_name, table_schema "
+            "FROM information_schema.tables "
+            "WHERE table_type = 'BASE TABLE'"
         ).fetchall()
         print(f"\n{name}: ✅ ({path.stat().st_size / 1024:.1f} KB)")
         for t in tables:
-            count = con.execute(f"SELECT count(*) FROM {t[1]}.{t[0]}").fetchone()[0]
+            tref = f"{safe_layer(t[1])}.{safe_table(t[0])}"
+            count = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
             cols = con.execute(
-                f"SELECT count(*) FROM information_schema.columns WHERE table_name = '{t[0]}'"
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = ?",
+                [t[0]],
             ).fetchone()[0]
-            print(f"  {t[0]} ({t[1]}): {count} rows, {cols} columns")
+            print(f" {t[0]} ({t[1]}): {count} rows, {cols} columns")
         con.close()
 
-    # Sample data check
     sample_dir = DATA_DIR / "sample"
     if sample_dir.exists():
         files = list(sample_dir.glob("*"))
-        print(
-            f"\nSample data: {len(files)} files, {sum(f.stat().st_size for f in files) / 1024:.1f} KB"
-        )
+        total_kb = sum(f.stat().st_size for f in files) / 1024
+        print(f"\nSample data: {len(files)} files, {total_kb:.1f} KB")
 
 
 def cmd_trace(args):
-    """Trace a table through all Medallion layers."""
     table = args.table
     print(f"Tracing '{table}' through pipeline...\n")
     layers = {
@@ -79,20 +81,22 @@ def cmd_trace(args):
             continue
         con = duckdb.connect(str(path))
         try:
-            rows = con.execute(f"SELECT count(*) FROM {name.lower()}.{table}").fetchone()[0]
+            tref = f"{safe_layer(name.lower())}.{safe_table(table)}"
+            rows = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
             cols = con.execute(
-                f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{name.lower()}'"
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name = ? AND table_schema = ?",
+                [table, name.lower()],
             ).fetchall()
             print(f"{name}: ✅ {rows} rows")
             for col, dtype in cols:
-                print(f"  {col}: {dtype}")
+                print(f" {col}: {dtype}")
         except Exception:
             print(f"{name}: ⚠️ Not found")
         con.close()
 
 
 def cmd_profile(args):
-    """Profile a table — row count, nulls, distinct, min/max."""
     table = args.table
     layer = args.layer or "silver"
     db_path = DATA_DIR / f"{layer}.duckdb"
@@ -102,20 +106,22 @@ def cmd_profile(args):
     con = duckdb.connect(str(db_path))
     try:
         cols = con.execute(
-            f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'"
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_name = ? AND table_schema = ?",
+            [table, layer],
         ).fetchall()
-        total_rows = con.execute(f"SELECT count(*) FROM {layer}.{table}").fetchone()[0]
+        tref = f"{safe_layer(layer)}.{safe_table(table)}"
+        total_rows = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
         print(f"Table: {layer}.{table} — {total_rows} rows\n")
         for col, dtype in cols:
-            nulls = con.execute(
-                f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
-            ).fetchone()[0]
-            distinct = con.execute(f"SELECT count(DISTINCT {col}) FROM {layer}.{table}").fetchone()[
-                0
-            ]
+            qcol = safe_column(col)
+            nulls = con.execute(f"SELECT count(*) FROM {tref} WHERE {qcol} IS NULL").fetchone()[0]
+            distinct = con.execute(f"SELECT count(DISTINCT {qcol}) FROM {tref}").fetchone()[0]
             null_pct = round(nulls / total_rows * 100, 1) if total_rows else 0
             print(
-                f"  {col:25s} {dtype:15s} nulls: {nulls:>5d} ({null_pct:>4.1f}%) distinct: {distinct}"
+                f" {col:25s} {dtype:15s} "
+                f"nulls: {nulls:>5d} ({null_pct:>4.1f}%) "
+                f"distinct: {distinct}"
             )
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -123,7 +129,6 @@ def cmd_profile(args):
 
 
 def cmd_quality(args):
-    """Run data quality checks on a table."""
     table = args.table
     layer = args.layer or "silver"
     db_path = DATA_DIR / f"{layer}.duckdb"
@@ -133,23 +138,27 @@ def cmd_quality(args):
     con = duckdb.connect(str(db_path))
     try:
         cols = con.execute(
-            f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' AND table_schema = '{layer}'"
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = ? AND table_schema = ?",
+            [table, layer],
         ).fetchall()
         checks = [("not_null", c[0]) for c in cols]
         print(f"Quality checks for {layer}.{table}:\n")
+        tref = f"{safe_layer(layer)}.{safe_table(table)}"
         passed = 0
         for rule, col in checks:
             try:
+                qcol = safe_column(col)
                 failed = con.execute(
-                    f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
+                    f"SELECT count(*) FROM {tref} WHERE {qcol} IS NULL"
                 ).fetchone()[0]
                 ok = failed == 0
                 marker = "✅" if ok else "❌"
-                print(f"  {marker} {col} {rule} (failures: {failed})")
+                print(f" {marker} {col} {rule} (failures: {failed})")
                 if ok:
                     passed += 1
             except Exception as e:
-                print(f"  ⚠️ {col} {rule}: {e}")
+                print(f" ⚠️ {col} {rule}: {e}")
         print(f"\n{passed}/{len(checks)} checks passed")
     except Exception as e:
         print(f"❌ Error: {e}")

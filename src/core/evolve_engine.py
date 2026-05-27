@@ -27,6 +27,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.core.config import settings
 from src.core.learnings import Learning, LearningCategory, LearningEmitter
 from src.core.llm import llm
 
@@ -43,9 +44,7 @@ class ProjectEntry(BaseModel):
     last_harvest: str = ""
     status: str = "active"
     learning_count: int = 0
-    registered_at: str = Field(
-        default_factory=lambda: datetime.now().isoformat()
-    )
+    registered_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class AppliedChange(BaseModel):
@@ -60,9 +59,7 @@ class AppliedChange(BaseModel):
 
 class EvolveEngine:
     def __init__(self, template_path: str | Path | None = None):
-        self.template_path = Path(
-            template_path or "E:\\projects\\template-base"
-        )
+        self.template_path = Path(template_path or settings.template_path)
         self._ensure_dirs()
 
     def _ensure_dirs(self):
@@ -82,9 +79,7 @@ class EvolveEngine:
 
     def save_projects(self, projects: list[ProjectEntry]):
         PROJECTS_FILE.write_text(
-            json.dumps(
-                [p.model_dump() for p in projects], indent=2
-            ) + "\n",
+            json.dumps([p.model_dump() for p in projects], indent=2) + "\n",
             encoding="utf-8",
         )
 
@@ -106,7 +101,6 @@ class EvolveEngine:
         known = {p.path for p in self.load_projects()}
         search_paths = [
             Path.home() / "projects",
-            Path("E:\\projects"),
             Path.cwd().parent,
         ]
         for search in search_paths:
@@ -166,9 +160,11 @@ class EvolveEngine:
     def load_harvested(self, category: str | None = None) -> list[Learning]:
         """Load all harvested learnings, optionally filtered by category."""
         learnings: list[Learning] = []
-        dirs = [LEARNINGS_DIR / category] if category else [
-            LEARNINGS_DIR / c.value for c in LearningCategory
-        ]
+        dirs = (
+            [LEARNINGS_DIR / category]
+            if category
+            else [LEARNINGS_DIR / c.value for c in LearningCategory]
+        )
         for d in dirs:
             if not d.exists():
                 continue
@@ -194,9 +190,11 @@ class EvolveEngine:
                 by_domain.setdefault(learning.domain, []).append(learning)
 
         high_value = [
-            learning for learning in learnings
+            learning
+            for learning in learnings
             if learning.confidence >= 0.7
-            or learning.category in (
+            or learning.category
+            in (
                 LearningCategory.ERROR_RESOLUTION,
                 LearningCategory.PATTERN_DISCOVERED,
             )
@@ -208,8 +206,8 @@ class EvolveEngine:
             "by_domain": {k: len(v) for k, v in by_domain.items()},
             "high_value": len(high_value),
             "high_value_items": [
-            {"id": learning.id, "title": learning.title, "category": learning.category.value}
-            for learning in sorted(high_value, key=lambda x: x.confidence, reverse=True)[:10]
+                {"id": learning.id, "title": learning.title, "category": learning.category.value}
+                for learning in sorted(high_value, key=lambda x: x.confidence, reverse=True)[:10]
             ],
         }
 
@@ -227,10 +225,7 @@ class EvolveEngine:
 
     def _log_applied(self, change: AppliedChange):
         log_file = APPLIED_DIR / f"{change.id}.json"
-        log_file.write_text(
-            change.model_dump_json(indent=2) + "\n",
-            encoding="utf-8"
-        )
+        log_file.write_text(change.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
     def _generate_kb_article(self, learning: Learning) -> str:
         """Use LLM to generate a KB article from a learning."""
@@ -250,10 +245,7 @@ class EvolveEngine:
             "Keep it under 50 lines."
         )
         try:
-            resp = llm.chat(
-                [{"role": "user", "content": prompt}],
-                max_tokens=1024
-            )
+            resp = llm.chat([{"role": "user", "content": prompt}], max_tokens=1024)
             return resp.content
         except Exception:
             return f"# {learning.title}\n\n{learning.body}\n"
@@ -263,9 +255,7 @@ class EvolveEngine:
         for learning in learnings:
             if not learning.domain:
                 continue
-            concepts_dir = (
-                self.template_path / ".opencode" / "kb" / learning.domain / "concepts"
-            )
+            concepts_dir = self.template_path / ".opencode" / "kb" / learning.domain / "concepts"
             concepts_dir.mkdir(parents=True, exist_ok=True)
             slug = learning.title.lower().replace(" ", "-").replace("/", "-")[:40]
             article_path = concepts_dir / f"{slug}.md"
@@ -282,9 +272,7 @@ class EvolveEngine:
             change = AppliedChange(
                 category=learning.category.value,
                 title=learning.title,
-                target_file=str(
-                    article_path.relative_to(self.template_path)
-                ),
+                target_file=str(article_path.relative_to(self.template_path)),
                 description=f"KB article from {learning.project_name}",
                 backup_path=backup,
             )
@@ -317,9 +305,7 @@ class EvolveEngine:
             change = AppliedChange(
                 category=learning.category.value,
                 title=learning.title,
-                target_file=str(
-                    agent_file.relative_to(self.template_path)
-                ),
+                target_file=str(agent_file.relative_to(self.template_path)),
                 description=f"Agent improvement from {learning.project_name}",
                 backup_path=backup,
             )
@@ -335,9 +321,7 @@ class EvolveEngine:
         for learning in learnings:
             if not learning.domain:
                 continue
-            concepts_dir = (
-                self.template_path / ".opencode" / "kb" / learning.domain / "concepts"
-            )
+            concepts_dir = self.template_path / ".opencode" / "kb" / learning.domain / "concepts"
             concepts_dir.mkdir(parents=True, exist_ok=True)
             catalog_path = concepts_dir / "error-catalog.md"
 
@@ -362,9 +346,7 @@ class EvolveEngine:
             change = AppliedChange(
                 category=learning.category.value,
                 title=learning.title,
-                target_file=str(
-                    catalog_path.relative_to(self.template_path)
-                ),
+                target_file=str(catalog_path.relative_to(self.template_path)),
                 description=f"Error catalog entry from {learning.project_name}",
                 backup_path=backup,
             )
@@ -380,9 +362,7 @@ class EvolveEngine:
         for learning in learnings:
             if not learning.domain:
                 continue
-            patterns_dir = (
-                self.template_path / ".opencode" / "kb" / learning.domain / "patterns"
-            )
+            patterns_dir = self.template_path / ".opencode" / "kb" / learning.domain / "patterns"
             patterns_dir.mkdir(parents=True, exist_ok=True)
             slug = learning.title.lower().replace(" ", "-").replace("/", "-")[:40]
             pattern_path = patterns_dir / f"{slug}.md"
@@ -394,9 +374,7 @@ class EvolveEngine:
             change = AppliedChange(
                 category=learning.category.value,
                 title=learning.title,
-                target_file=str(
-                    pattern_path.relative_to(self.template_path)
-                ),
+                target_file=str(pattern_path.relative_to(self.template_path)),
                 description=f"Pattern from {learning.project_name}",
                 backup_path=backup,
             )
@@ -427,12 +405,14 @@ class EvolveEngine:
                 all_changes.extend(changes)
             else:
                 for learning in items:
-                    all_changes.append(AppliedChange(
-                        category=cat,
-                        title=learning.title,
-                        target_file=f"(dry run) {learning.domain}/{learning.title}",
-                        description=f"Would apply from {learning.project_name}",
-                    ))
+                    all_changes.append(
+                        AppliedChange(
+                            category=cat,
+                            title=learning.title,
+                            target_file=f"(dry run) {learning.domain}/{learning.title}",
+                            description=f"Would apply from {learning.project_name}",
+                        )
+                    )
         return all_changes
 
     # ── Rollback ──────────────────────────────────────────────
@@ -449,9 +429,7 @@ class EvolveEngine:
             if not log_file.exists():
                 continue
             try:
-                change = AppliedChange(
-                    **json.loads(log_file.read_text(encoding="utf-8"))
-                )
+                change = AppliedChange(**json.loads(log_file.read_text(encoding="utf-8")))
                 if change.backup_path and Path(change.backup_path).exists():
                     target = self.template_path / change.target_file
                     shutil.copy2(change.backup_path, target)

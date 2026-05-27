@@ -52,9 +52,7 @@ class TaskQueue:
         )
         if pending:
             consumer = pending[0]["consumer"]
-            await self._redis.xclaim(
-                STREAM_KEY, GROUP_NAME, consumer, 0, [msg_id]
-            )
+            await self._redis.xclaim(STREAM_KEY, GROUP_NAME, consumer, 0, [msg_id])
             entry_data = await self._redis.xrange(STREAM_KEY, min=msg_id, max=msg_id, count=1)
             if entry_data:
                 _, fields = entry_data[0]

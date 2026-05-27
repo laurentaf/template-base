@@ -44,9 +44,7 @@ class HarvestDaemon:
         auto_apply: bool | None = None,
         template_path: str | None = None,
     ):
-        self.interval = interval or getattr(
-            settings, "EVOLVE_DAEMON_INTERVAL", DEFAULT_INTERVAL
-        )
+        self.interval = interval or getattr(settings, "EVOLVE_DAEMON_INTERVAL", DEFAULT_INTERVAL)
         self.auto_analyze = (
             auto_analyze
             if auto_analyze is not None
@@ -92,35 +90,36 @@ class HarvestDaemon:
             self.engine.discover_projects()
             results = self.engine.harvest_all()
             total = sum(len(v) for v in results.values())
-            self._log(
-                f"Harvested {total} learnings from {len(results)} projects"
-            )
+            self._log(f"Harvested {total} learnings from {len(results)} projects")
 
             if total > 0 and self.auto_analyze:
                 analysis = self.engine.analyze()
                 self._log(
-                    f"Analysis: {analysis['total']} total,"
-                    f" {analysis['high_value']} high-value"
+                    f"Analysis: {analysis['total']} total, {analysis['high_value']} high-value"
                 )
 
                 if self.auto_apply and analysis["high_value"] > 0:
                     changes = self.engine.apply()
                     self._log(f"Auto-applied {len(changes)} improvements")
 
-            self._save_state({
-                "last_cycle": self._cycle_count,
-                "last_harvest_count": total,
-                "last_projects": len(results),
-                "status": "running",
-            })
+            self._save_state(
+                {
+                    "last_cycle": self._cycle_count,
+                    "last_harvest_count": total,
+                    "last_projects": len(results),
+                    "status": "running",
+                }
+            )
 
         except Exception as exc:
             self._log(f"Cycle error: {exc}")
-            self._save_state({
-                "last_cycle": self._cycle_count,
-                "status": "error",
-                "error": str(exc),
-            })
+            self._save_state(
+                {
+                    "last_cycle": self._cycle_count,
+                    "status": "error",
+                    "error": str(exc),
+                }
+            )
 
     def _wait(self):
         """Sleep in small increments so signal handling works promptly."""
@@ -203,9 +202,9 @@ class HarvestDaemon:
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            creationflags=(
-                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-            ) if sys.platform == "win32" else 0,
+            creationflags=(subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+            if sys.platform == "win32"
+            else 0,
         )
         return proc.pid
 

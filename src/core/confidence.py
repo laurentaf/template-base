@@ -126,12 +126,19 @@ class ConfidenceEngine:
 
     def classify_category(self, task_description: str, task_type: str = "") -> TaskCategory:
         critical_keywords = [
-            "security", "auth", "secret",
-            "credential", "production_deploy", "delete_data",
+            "security",
+            "auth",
+            "secret",
+            "credential",
+            "production_deploy",
+            "delete_data",
         ]
         important_keywords = [
-            "architecture", "breaking_change", "migration",
-            "schema_change", "config_change",
+            "architecture",
+            "breaking_change",
+            "migration",
+            "schema_change",
+            "config_change",
         ]
 
         text = f"{task_description} {task_type}".lower()
@@ -251,12 +258,14 @@ class ConfidenceEngine:
                 kb_result = await kb_lookup(task_description)
                 if kb_result and kb_result.get("found"):
                     kb_has_pattern = True
-                    sources.append(ValidationSource(
-                        source_type="kb",
-                        name=kb_result.get("source", "unknown"),
-                        result="found",
-                        summary=kb_result.get("summary", ""),
-                    ))
+                    sources.append(
+                        ValidationSource(
+                            source_type="kb",
+                            name=kb_result.get("source", "unknown"),
+                            result="found",
+                            summary=kb_result.get("summary", ""),
+                        )
+                    )
                     if kb_result.get("multiple_sources"):
                         active_conditions.append("multiple_kb_sources_agree")
                     if kb_result.get("fresh"):
@@ -275,8 +284,14 @@ class ConfidenceEngine:
                 research_notes.append("KB lookup failed")
 
         report = self.evaluate(
-            task_description, task_type, kb_has_pattern, mcp_result,
-            active_conditions, 0, research_notes, sources,
+            task_description,
+            task_type,
+            kb_has_pattern,
+            mcp_result,
+            active_conditions,
+            0,
+            research_notes,
+            sources,
         )
 
         for round_num in range(1, self.max_research_rounds + 1):
@@ -290,12 +305,14 @@ class ConfidenceEngine:
                     mcp_resp = await mcp_query(task_description)
                     if mcp_resp:
                         mcp_result = "agrees" if mcp_resp.get("agrees", False) else "disagrees"
-                        sources.append(ValidationSource(
-                            source_type="mcp",
-                            name=mcp_resp.get("source", "mcp"),
-                            result=mcp_result,
-                            summary=mcp_resp.get("summary", ""),
-                        ))
+                        sources.append(
+                            ValidationSource(
+                                source_type="mcp",
+                                name=mcp_resp.get("source", "mcp"),
+                                result=mcp_result,
+                                summary=mcp_resp.get("summary", ""),
+                            )
+                        )
                         if mcp_resp.get("fresh"):
                             active_conditions.append("fresh_info_lt_1_month")
                         if mcp_resp.get("production_examples"):
@@ -310,20 +327,28 @@ class ConfidenceEngine:
                     web_resp = await internet_search(task_description)
                     if web_resp and web_resp.get("found"):
                         active_conditions.append("research_round_improved_score")
-                        sources.append(ValidationSource(
-                            source_type="internet",
-                            name=web_resp.get("source", "web_search"),
-                            result="found",
-                            summary=web_resp.get("summary", ""),
-                        ))
+                        sources.append(
+                            ValidationSource(
+                                source_type="internet",
+                                name=web_resp.get("source", "web_search"),
+                                result="found",
+                                summary=web_resp.get("summary", ""),
+                            )
+                        )
                         if web_resp.get("production_examples"):
                             active_conditions.append("production_examples_exist")
                 except Exception:
                     research_notes.append("Internet search failed")
 
             report = self.evaluate(
-                task_description, task_type, kb_has_pattern, mcp_result,
-                active_conditions, round_num, research_notes, sources,
+                task_description,
+                task_type,
+                kb_has_pattern,
+                mcp_result,
+                active_conditions,
+                round_num,
+                research_notes,
+                sources,
             )
 
         return report

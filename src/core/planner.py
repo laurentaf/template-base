@@ -74,8 +74,8 @@ class ProjectPlanner:
             prompt = (
                 f"For a data engineering project described as: '{description}'\n"
                 "What agents, infrastructure, and data model would you recommend? "
-                "Respond with JSON: {\"agents\": [...], \"infrastructure\": [...], "
-                "\"data_model\": [...], \"agrees\": true/false}"
+                'Respond with JSON: {"agents": [...], "infrastructure": [...], '
+                '"data_model": [...], "agrees": true/false}'
             )
             resp = llm.chat([{"role": "user", "content": prompt}], max_tokens=1024)
             try:
@@ -88,11 +88,11 @@ class ProjectPlanner:
                 }
             except json.JSONDecodeError:
                 return {
-                "found": True,
-                "source": "llm_mcp",
-                "agrees": True,
-                "summary": resp.content[:500],
-            }
+                    "found": True,
+                    "source": "llm_mcp",
+                    "agrees": True,
+                    "summary": resp.content[:500],
+                }
         except Exception:
             return None
 
@@ -255,9 +255,7 @@ class ProjectPlanner:
         ai_plan = plan_data.get("ai_plan", {})
         if ai_plan.get("entities"):
             design_content += (
-                "\n## Data Model\n\n"
-                "| Entity | Store | Fields |\n"
-                "|--------|-------|--------|\n"
+                "\n## Data Model\n\n| Entity | Store | Fields |\n|--------|-------|--------|\n"
             )
             for entity in ai_plan["entities"]:
                 if isinstance(entity, dict):

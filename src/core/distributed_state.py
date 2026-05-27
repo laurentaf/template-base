@@ -31,9 +31,7 @@ class DistributedStateManager:
             current = await self.get_state(key)
         if current and current.get("version", 0) != version:
             expected, got = version, current.get("version", 0)
-            raise ValueError(
-                f"Version conflict for {key}: expected {expected}, got {got}"
-            )
+            raise ValueError(f"Version conflict for {key}: expected {expected}, got {got}")
             value["version"] = (current.get("version", 0) if current else 0) + 1
             async with self._redis.pipeline(transaction=True) as pipe:
                 await pipe.watch(state_key)

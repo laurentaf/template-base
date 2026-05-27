@@ -92,9 +92,7 @@ class LocalDistributedState:
             current = self._data.get(state_key)
             if version is not None and current and current.get("version", 0) != version:
                 expected, got = version, current.get("version", 0)
-                raise ValueError(
-                    f"Version conflict for {key}: expected {expected}, got {got}"
-                )
+                raise ValueError(f"Version conflict for {key}: expected {expected}, got {got}")
             value["version"] = (current.get("version", 0) if current else 0) + 1
             self._data[state_key] = dict(value)
 

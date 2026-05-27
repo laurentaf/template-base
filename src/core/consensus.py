@@ -60,16 +60,31 @@ class ConsensusEngine:
         text = f"{task_type} {task_description}".lower()
 
         consensus_keywords = [
-            "architecture_decision", "design_choice", "technology_selection",
-            "trade_off", "evaluate", "recommend", "opinion",
+            "architecture_decision",
+            "design_choice",
+            "technology_selection",
+            "trade_off",
+            "evaluate",
+            "recommend",
+            "opinion",
         ]
         parallel_keywords = [
-            "validate_all", "check_all", "audit_all", "review_all",
-            "batch", "fan_out", "scatter", "independent",
+            "validate_all",
+            "check_all",
+            "audit_all",
+            "review_all",
+            "batch",
+            "fan_out",
+            "scatter",
+            "independent",
         ]
         hierarchical_keywords = [
-            "complex_workflow", "multi_phase", "sub_orchestrate",
-            "delegate", "escalate", "tiered",
+            "complex_workflow",
+            "multi_phase",
+            "sub_orchestrate",
+            "delegate",
+            "escalate",
+            "tiered",
         ]
 
         for kw in consensus_keywords:
@@ -113,13 +128,15 @@ class ConsensusEngine:
                 continue
             vote_value = result.output if result.status == "completed" else None
             confidence = result.metrics.get("confidence", 0.5) if result.metrics else 0.5
-            votes.append(Vote(
-                agent_id=aid,
-                agent_type=aid.split("-")[0] if "-" in aid else aid,
-                vote_value=vote_value,
-                confidence=confidence,
-                reasoning=result.metrics.get("reasoning", "") if result.metrics else "",
-            ))
+            votes.append(
+                Vote(
+                    agent_id=aid,
+                    agent_type=aid.split("-")[0] if "-" in aid else aid,
+                    vote_value=vote_value,
+                    confidence=confidence,
+                    reasoning=result.metrics.get("reasoning", "") if result.metrics else "",
+                )
+            )
 
         if not votes:
             return ConsensusResult(
@@ -155,9 +172,9 @@ class ConsensusEngine:
             confidence=round(avg_confidence, 4),
             requires_user_approval=requires_approval,
             reasoning=(
-            f"Agreement: {agreement_ratio:.0%} (quorum: {quorum:.0%}),"
-            f" avg confidence: {avg_confidence:.2f}"
-        ),
+                f"Agreement: {agreement_ratio:.0%} (quorum: {quorum:.0%}),"
+                f" avg confidence: {avg_confidence:.2f}"
+            ),
         )
 
     async def run_parallel(
@@ -177,11 +194,13 @@ class ConsensusEngine:
             if isinstance(result, Exception):
                 continue
             if result.status == "completed":
-                successful.append({
-                    "agent_id": aid,
-                    "output": result.output,
-                    "metrics": result.metrics,
-                })
+                successful.append(
+                    {
+                        "agent_id": aid,
+                        "output": result.output,
+                        "metrics": result.metrics,
+                    }
+                )
 
         if top_k and len(successful) > top_k:
             successful.sort(key=lambda x: x.get("metrics", {}).get("confidence", 0), reverse=True)
@@ -225,9 +244,9 @@ class ConsensusEngine:
             confidence=0.9 if all("error" not in r for r in results) else 0.3,
             requires_user_approval=False,
             reasoning=(
-            f"Sequential chain: {len(results)} steps,"
-            f" {sum(1 for r in results if 'error' not in r)} succeeded"
-        ),
+                f"Sequential chain: {len(results)} steps,"
+                f" {sum(1 for r in results if 'error' not in r)} succeeded"
+            ),
         )
 
     async def run_hierarchical(
@@ -254,9 +273,10 @@ class ConsensusEngine:
         worker_results: list[dict] = []
         for round_num in range(max_delegation_rounds):
             pending = [
-            st for st in sub_tasks
-            if st.get("step_id") not in {r["step_id"] for r in worker_results}
-        ]
+                st
+                for st in sub_tasks
+                if st.get("step_id") not in {r["step_id"] for r in worker_results}
+            ]
             if not pending:
                 break
 
@@ -264,10 +284,12 @@ class ConsensusEngine:
                 agent_type = sub_task_def.get("agent_type", "data-pipeline")
                 handler = worker_handlers.get(agent_type)
                 if not handler:
-                    worker_results.append({
-                "step_id": sub_task_def.get("step_id"),
-                "error": f"No handler for {agent_type}",
-            })
+                    worker_results.append(
+                        {
+                            "step_id": sub_task_def.get("step_id"),
+                            "error": f"No handler for {agent_type}",
+                        }
+                    )
                     continue
 
                 sub_task = Task(
@@ -278,16 +300,20 @@ class ConsensusEngine:
                 )
                 try:
                     result = await handler(sub_task)
-                    worker_results.append({
-                        "step_id": sub_task_def.get("step_id"),
-                        "status": result.status,
-                        "output": result.output,
-                    })
+                    worker_results.append(
+                        {
+                            "step_id": sub_task_def.get("step_id"),
+                            "status": result.status,
+                            "output": result.output,
+                        }
+                    )
                 except Exception as e:
-                    worker_results.append({
-                        "step_id": sub_task_def.get("step_id"),
-                        "error": str(e),
-                    })
+                    worker_results.append(
+                        {
+                            "step_id": sub_task_def.get("step_id"),
+                            "error": str(e),
+                        }
+                    )
 
         synthesis_task = Task(
             task_id=f"synthesize-{task.task_id}",
@@ -304,9 +330,9 @@ class ConsensusEngine:
             confidence=0.85,
             requires_user_approval=True,
             reasoning=(
-            f"Hierarchical: {len(worker_results)} sub-tasks"
-            f" across {max_delegation_rounds} rounds"
-        ),
+                f"Hierarchical: {len(worker_results)} sub-tasks"
+                f" across {max_delegation_rounds} rounds"
+            ),
         )
 
 

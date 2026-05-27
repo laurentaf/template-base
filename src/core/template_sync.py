@@ -3,6 +3,8 @@ import json
 import shutil
 from pathlib import Path
 
+from src.core.config import settings
+
 IGNORE_DIRS = {".venv", "__pycache__", ".git", ".gitignore", ".mypy_cache", ".pytest_cache"}
 IGNORE_FILES = {"uv.lock", ".harness_state.json", ".template-info.json"}
 
@@ -62,11 +64,11 @@ def get_git_commit(path: str) -> str:
 
 def sync_project(
     project_root: str,
-    template_root: str = "E:\\projects\\template-base",
+    template_root: str | None = None,
     dry_run: bool = False,
 ) -> dict:
+    templ = Path(template_root or settings.template_path)
     proj = Path(project_root)
-    templ = Path(template_root)
 
     if not templ.exists():
         return {"success": False, "error": f"Template not found: {template_root}"}

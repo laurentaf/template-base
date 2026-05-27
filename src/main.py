@@ -110,9 +110,7 @@ def decision_add(
     title: str = typer.Option(..., "--title", "-t", help="Decision title"),
     context: str = typer.Option(..., "--context", "-c", help="Why this decision was needed"),
     decision: str = typer.Option(..., "--decision", "-d", help="What was decided"),
-    consequences: str = typer.Option(
-        ..., "--consequences", "-q", help="Impact of the decision"
-    ),
+    consequences: str = typer.Option(..., "--consequences", "-q", help="Impact of the decision"),
     phase: str = typer.Option("design", "--phase", "-p", help="SDD phase"),
     author: str = typer.Option("user", "--author", "-a", help="Who made the decision"),
     feature: str = typer.Option(None, "--feature", "-f", help="Feature name"),
@@ -221,26 +219,24 @@ def rag_search(
 def sync(
     project: str = typer.Argument(".", help="Project directory to sync"),
     template: str = typer.Option(
-        "E:\\projects\\template-base", "--template", "-t", help="Template directory"
+        "", "--template", "-t", help="Template directory (default: auto-detect)"
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", "-n", help="Show what would change without applying"
     ),
 ):
     """Sync project with latest template changes."""
+    from src.core.config import settings
     from src.core.template_sync import sync_project
 
-    result = sync_project(
-        str(Path(project).resolve()), str(Path(template).resolve()), dry_run=dry_run
-    )
+    tmpl = template or settings.template_path
+    result = sync_project(str(Path(project).resolve()), str(Path(tmpl).resolve()), dry_run=dry_run)
 
     if not result["success"]:
         typer.echo(f"Error: {result['error']}")
         raise typer.Exit(1)
 
-    typer.echo(
-        f"Template sync: {result['unchanged']} unchanged, {len(result['updated'])} updated"
-    )
+    typer.echo(f"Template sync: {result['unchanged']} unchanged, {len(result['updated'])} updated")
     if result["updated"]:
         for f in result["updated"]:
             typer.echo(f" Updated: {f}")
@@ -262,9 +258,7 @@ def sync(
 def init(
     project_name: str = typer.Option(None, "--name", "-n", help="Project name"),
     tier: str = typer.Option("development", "--tier", "-t", help="Execution tier"),
-    skip_infra: bool = typer.Option(
-        False, "--skip-infra", help="Skip infrastructure checks"
-    ),
+    skip_infra: bool = typer.Option(False, "--skip-infra", help="Skip infrastructure checks"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Accept defaults without prompts"),
 ):
     """Initialize project on first run (bootstrap)."""
@@ -272,9 +266,7 @@ def init(
 
     from src.core.bootstrapper import BootstrapEngine
 
-    engine = BootstrapEngine(
-        project_name=project_name, tier=tier, skip_infra=skip_infra, yes=yes
-    )
+    engine = BootstrapEngine(project_name=project_name, tier=tier, skip_infra=skip_infra, yes=yes)
     asyncio.run(engine.run())
 
 
@@ -307,15 +299,17 @@ def plan(
 def template_info(
     project: str = typer.Option(".", "--project", "-p", help="Project directory"),
     template: str = typer.Option(
-        "E:\\projects\\template-base", "--template", "-t", help="Template directory"
+        "", "--template", "-t", help="Template directory (default: auto-detect)"
     ),
 ):
     """Write .template-info.json for a project (used by ltade-new)."""
+    from src.core.config import settings
     from src.core.template_sync import get_git_commit, save_template_info, scan_template
 
-    files = scan_template(template)
-    commit = get_git_commit(template)
-    save_template_info(str(Path(project).resolve()), template, commit, files)
+    tmpl = template or settings.template_path
+    files = scan_template(tmpl)
+    commit = get_git_commit(tmpl)
+    save_template_info(str(Path(project).resolve()), tmpl, commit, files)
     typer.echo(f"Written .template-info.json ({len(files)} files tracked)")
 
 
@@ -327,9 +321,7 @@ def agents_start(
     agent_types: str = typer.Option(
         "all", "--types", "-t", help="Comma-separated agent types or 'all'"
     ),
-    mode: str = typer.Option(
-        "auto", "--mode", "-m", help="auto, local, or distributed"
-    ),
+    mode: str = typer.Option("auto", "--mode", "-m", help="auto, local, or distributed"),
 ):
     """Start agent workers."""
     import asyncio
@@ -387,9 +379,7 @@ def evolve_register(
 
 @evolve_app.command("harvest")
 def evolve_harvest(
-    project: str = typer.Option(
-        "", "--project", "-p", help="Specific project path (empty = all)"
-    ),
+    project: str = typer.Option("", "--project", "-p", help="Specific project path (empty = all)"),
 ):
     """Harvest learnings from projects."""
     from src.core.evolve_engine import evolve_engine
@@ -440,13 +430,15 @@ def evolve_analyze():
 def evolve_apply(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would change"),
     template: str = typer.Option(
-        "E:\\projects\\template-base", "--template", "-t", help="Template path"
+        "", "--template", "-t", help="Template path (default: auto-detect)"
     ),
 ):
     """Apply harvested learnings to the template."""
+    from src.core.config import settings
     from src.core.evolve_engine import EvolveEngine
 
-    engine = EvolveEngine(template_path=template)
+    tmpl = template or settings.template_path
+    engine = EvolveEngine(template_path=tmpl)
     changes = engine.apply(dry_run=dry_run)
     if not changes:
         typer.echo("No improvements to apply.")
@@ -461,13 +453,15 @@ def evolve_apply(
 def evolve_rollback(
     change_id: str = typer.Option("", "--id", help="Specific change ID (empty = last)"),
     template: str = typer.Option(
-        "E:\\projects\\template-base", "--template", "-t", help="Template path"
+        "", "--template", "-t", help="Template path (default: auto-detect)"
     ),
 ):
     """Rollback an applied evolve change."""
+    from src.core.config import settings
     from src.core.evolve_engine import EvolveEngine
 
-    engine = EvolveEngine(template_path=template)
+    tmpl = template or settings.template_path
+    engine = EvolveEngine(template_path=tmpl)
     restored = engine.rollback(change_id or None)
     if restored:
         typer.echo(f"Rolled back: {', '.join(restored)}")
@@ -477,24 +471,19 @@ def evolve_rollback(
 
 @evolve_app.command("daemon")
 def evolve_daemon(
-    interval: int = typer.Option(
-        300, "--interval", "-i", help="Seconds between harvest cycles"
-    ),
-    bg: bool = typer.Option(
-        False, "--bg", help="Run as background process"
-    ),
-    stop: bool = typer.Option(
-        False, "--stop", help="Stop background daemon"
-    ),
-    auto_apply: bool = typer.Option(
-        False, "--auto-apply", help="Auto-apply high-value learnings"
-    ),
+    interval: int = typer.Option(300, "--interval", "-i", help="Seconds between harvest cycles"),
+    bg: bool = typer.Option(False, "--bg", help="Run as background process"),
+    stop: bool = typer.Option(False, "--stop", help="Stop background daemon"),
+    auto_apply: bool = typer.Option(False, "--auto-apply", help="Auto-apply high-value learnings"),
     template: str = typer.Option(
-        "E:\\projects\\template-base", "--template", "-t", help="Template path"
+        "", "--template", "-t", help="Template path (default: auto-detect)"
     ),
 ):
     """Start/stop the periodic harvest daemon."""
+    from src.core.config import settings
     from src.core.harvest_daemon import HarvestDaemon
+
+    tmpl = template or settings.template_path
 
     if stop:
         if HarvestDaemon.stop():
@@ -504,20 +493,16 @@ def evolve_daemon(
         return
 
     if bg:
-        pid = HarvestDaemon.start_background(
-            interval=interval, template_path=template
-        )
+        pid = HarvestDaemon.start_background(interval=interval, template_path=tmpl)
         typer.echo(f"Daemon started in background (PID: {pid})")
         return
 
     daemon = HarvestDaemon(
         interval=interval,
         auto_apply=auto_apply,
-        template_path=template,
+        template_path=tmpl,
     )
-    typer.echo(
-        f"Starting daemon (interval={interval}s, auto_apply={auto_apply})"
-    )
+    typer.echo(f"Starting daemon (interval={interval}s, auto_apply={auto_apply})")
     typer.echo("Press Ctrl+C to stop.")
     daemon.start()
 

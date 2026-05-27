@@ -3,7 +3,12 @@ import asyncio
 from src.agents.base import BaseAgent
 from src.core.llm import llm
 from src.schemas.tasks import Task, TaskResult
-from src.tools.database import get_duckdb_connection
+from src.tools.database import (
+    get_duckdb_connection,
+    safe_column,
+    safe_layer,
+    safe_table,
+)
 
 
 class AnalyticsAgent(BaseAgent):
@@ -40,12 +45,13 @@ class AnalyticsAgent(BaseAgent):
         group_by = payload.get("group_by", [])
         db_path = payload.get("db_path", "data/silver.duckdb")
         layer = payload.get("layer", "silver")
-        measures_sql = ", ".join(measures)
-        group_sql = ", ".join(group_by) if group_by else ""
-        query = f"SELECT {measures_sql} FROM {layer}.{table}"
-        if group_sql:
-            query += f" GROUP BY {group_sql}"
         try:
+            tref = f"{safe_layer(layer)}.{safe_table(table)}"
+            measures_sql = ", ".join(measures)
+            group_sql = ", ".join(group_by) if group_by else ""
+            query = f"SELECT {measures_sql} FROM {tref}"
+            if group_sql:
+                query += f" GROUP BY {group_sql}"
             con = get_duckdb_connection(db_path)
             result = con.execute(query).fetchdf()
             con.close()
@@ -66,15 +72,17 @@ class AnalyticsAgent(BaseAgent):
         threshold = payload.get("zscore_threshold", 3.0)
         db_path = payload.get("db_path", "data/silver.duckdb")
         layer = payload.get("layer", "silver")
-        query = f"""
-            WITH stats AS (
-                SELECT avg({column}) AS mean, stddev({column}) AS std FROM {layer}.{table}
-            )
-            SELECT *, ({column} - mean) / NULLIF(std, 0) AS zscore
-            FROM {layer}.{table}, stats
-            WHERE abs(({column} - mean) / NULLIF(std, 0)) > {threshold}
-        """
         try:
+            tref = f"{safe_layer(layer)}.{safe_table(table)}"
+            col = safe_column(column)
+            query = f"""
+            WITH stats AS (
+                SELECT avg({col}) AS mean, stddev({col}) AS std FROM {tref}
+            )
+            SELECT *, ({col} - mean) / NULLIF(std, 0) AS zscore
+            FROM {tref}, stats
+            WHERE abs(({col} - mean) / NULLIF(std, 0)) > {float(threshold)}
+            """
             con = get_duckdb_connection(db_path)
             result = con.execute(query).fetchdf()
             con.close()
@@ -96,10 +104,12 @@ class AnalyticsAgent(BaseAgent):
         for table in tables:
             try:
                 con = get_duckdb_connection(db_path)
-                count = con.execute(f"SELECT count(*) FROM silver.{table}").fetchone()[0]
+                tref = f"silver.{safe_table(table)}"
+                count = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
                 cols = con.execute(
-                    f"SELECT column_name, data_type FROM information_schema.columns "
-                    f"WHERE table_name = '{table}' AND table_schema = 'silver'"
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    "WHERE table_name = ? AND table_schema = 'silver'",
+                    [table],
                 ).fetchall()
                 con.close()
                 col_desc = "\n".join(f"  - {c[0]}: {c[1]}" for c in cols)
@@ -130,19 +140,20 @@ class AnalyticsAgent(BaseAgent):
         layer = payload.get("layer", "silver")
         try:
             con = get_duckdb_connection(db_path)
-            count = con.execute(f"SELECT count(*) FROM {layer}.{table}").fetchone()[0]
+            tref = f"{safe_layer(layer)}.{safe_table(table)}"
+            count = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
             cols = con.execute(
-                f"SELECT column_name, data_type FROM information_schema.columns "
-                f"WHERE table_name = '{table}' AND table_schema = '{layer}'"
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name = ? AND table_schema = ?",
+                [table, layer],
             ).fetchall()
             profiles = []
             for col, dtype in cols:
-                nulls = con.execute(
-                    f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
-                ).fetchone()[0]
-                distinct = con.execute(
-                    f"SELECT count(DISTINCT {col}) FROM {layer}.{table}"
-                ).fetchone()[0]
+                qcol = safe_column(col)
+                nulls = con.execute(f"SELECT count(*) FROM {tref} WHERE {qcol} IS NULL").fetchone()[
+                    0
+                ]
+                distinct = con.execute(f"SELECT count(DISTINCT {qcol}) FROM {tref}").fetchone()[0]
                 profiles.append(
                     {"column": col, "type": dtype, "nulls": nulls, "distinct": distinct}
                 )
@@ -151,13 +162,13 @@ class AnalyticsAgent(BaseAgent):
                 f"Dataset: {layer}.{table}\n"
                 f"Total rows: {count}\n"
                 f"Columns:\n"
-        + "\n".join(
-            (
-                f" - {p['column']}: {p['type']}"
-                f" (nulls: {p['nulls']}, distinct: {p['distinct']})"
-            )
-            for p in profiles
-        )
+                + "\n".join(
+                    (
+                        f" - {p['column']}: {p['type']}"
+                        f" (nulls: {p['nulls']}, distinct: {p['distinct']})"
+                    )
+                    for p in profiles
+                )
                 + "\n\nDescribe this dataset: what each column likely represents, "
                 "data quality observations, and potential use cases."
             )

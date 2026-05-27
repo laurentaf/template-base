@@ -23,7 +23,9 @@ class AutoGit:
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return bool(result.stdout.strip())
         except Exception:
@@ -87,7 +89,8 @@ class AutoGit:
         try:
             subprocess.run(
                 ["git", "commit", "-m", message, "--no-verify"],
-                capture_output=True, timeout=30,
+                capture_output=True,
+                timeout=30,
             )
             return True
         except Exception:
@@ -113,7 +116,8 @@ class AutoGit:
         try:
             subprocess.run(
                 ["git", "checkout", "-b", branch_name],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
             return True
         except Exception:

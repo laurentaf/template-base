@@ -46,7 +46,9 @@ class BaseAgent(ABC):
         self.post_task_hooks.append(hook)
 
     async def evaluate_confidence(
-        self, task_description: str, task_type: str = "",
+        self,
+        task_description: str,
+        task_type: str = "",
     ) -> ConfidenceReport:
         report = confidence_engine.evaluate(task_description, task_type)
         self._last_confidence_report = report
@@ -60,15 +62,14 @@ class BaseAgent(ABC):
         except Exception:
             pass
 
-        self.post_task_hooks.append(
-            lambda t, r, a: auto_doc.update_after_task(t, r, a)
-        )
-        self.post_task_hooks.append(
-            lambda t, r, a: auto_git.auto_commit(t, r, a)
-        )
+        self.post_task_hooks.append(lambda t, r, a: auto_doc.update_after_task(t, r, a))
+        self.post_task_hooks.append(lambda t, r, a: auto_git.auto_commit(t, r, a))
         self.post_task_hooks.append(
             lambda t, r, a: learning_emitter.emit_from_task_result(
-                t, r, a, project_name=settings.PROJECT_NAME,
+                t,
+                r,
+                a,
+                project_name=settings.PROJECT_NAME,
             )
         )
 
@@ -139,7 +140,9 @@ class BaseAgent(ABC):
                     },
                 )
                 await self._run_post_hooks(
-                    task.task_type, result.model_dump(), self.agent_type,
+                    task.task_type,
+                    result.model_dump(),
+                    self.agent_type,
                 )
             except Exception as e:
                 await self.task_queue.nack(msg["msg_id"])
@@ -148,7 +151,9 @@ class BaseAgent(ABC):
                     {"task_id": task.task_id, "agent_id": self.agent_id, "error": str(e)},
                 )
                 await self._run_post_hooks(
-                    task.task_type, {"error": str(e)}, self.agent_type,
+                    task.task_type,
+                    {"error": str(e)},
+                    self.agent_type,
                 )
             finally:
                 await self.registry.set_status(self.agent_id, "idle")

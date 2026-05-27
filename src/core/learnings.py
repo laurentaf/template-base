@@ -137,18 +137,14 @@ class LearningEmitter:
         return results
 
     def load_since(self, since_iso: str) -> list[Learning]:
-        return [
-            learning for learning in self.load_all() if learning.timestamp >= since_iso
-        ]
+        return [learning for learning in self.load_all() if learning.timestamp >= since_iso]
 
     def prune_applied(self, applied_ids: list[str]):
         for lid in applied_ids:
             filepath = self.learnings_dir / f"{lid}.json"
             if filepath.exists():
                 filepath.unlink()
-        remaining = [
-            e for e in self.load_index() if e["id"] not in applied_ids
-        ]
+        remaining = [e for e in self.load_index() if e["id"] not in applied_ids]
         self._ensure_dir()
         self.index_path.write_text(
             json.dumps(remaining, indent=2) + "\n",

@@ -5,7 +5,12 @@ from src.core.data_quality import DataQualityValidator, QualityCheck
 from src.pipelines.medallion import bronze, gold, silver
 from src.schemas.messages import AgentMessage
 from src.schemas.tasks import Task, TaskResult
-from src.tools.database import get_duckdb_connection, get_postgres_engine
+from src.tools.database import (
+    get_duckdb_connection,
+    get_postgres_engine,
+    safe_column,
+    safe_table,
+)
 
 
 class DataPipelineAgent(BaseAgent):
@@ -79,8 +84,9 @@ class DataPipelineAgent(BaseAgent):
         db_path = payload.get("db_path", ":memory:")
         try:
             con = get_duckdb_connection(db_path)
-            con.execute(f"CREATE TABLE {table} AS SELECT * FROM read_csv_auto('{path}')")
-            count = con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+            qtable = safe_table(table)
+            con.execute(f"CREATE TABLE {qtable} AS SELECT * FROM read_csv_auto(?)", [path])
+            count = con.execute(f"SELECT count(*) FROM {qtable}").fetchone()[0]
             con.close()
             return TaskResult(
                 task_id=task_id,
@@ -99,8 +105,9 @@ class DataPipelineAgent(BaseAgent):
         db_path = payload.get("db_path", ":memory:")
         try:
             con = get_duckdb_connection(db_path)
-            con.execute(f"CREATE OR REPLACE TABLE {output_table} AS ({query})")
-            count = con.execute(f"SELECT count(*) FROM {output_table}").fetchone()[0]
+            qtable = safe_table(output_table)
+            con.execute(f"CREATE OR REPLACE TABLE {qtable} AS ({query})")
+            count = con.execute(f"SELECT count(*) FROM {qtable}").fetchone()[0]
             con.close()
             return TaskResult(
                 task_id=task_id,
@@ -120,21 +127,21 @@ class DataPipelineAgent(BaseAgent):
         results = []
         try:
             con = get_duckdb_connection(db_path)
+            tref = safe_table(table)
             for check in checks:
                 check_type = check.get("type")
                 column = check.get("column")
+                qcol = safe_column(column)
                 if check_type == "not_null":
                     nulls = con.execute(
-                        f"SELECT count(*) FROM {table} WHERE {column} IS NULL"
+                        f"SELECT count(*) FROM {tref} WHERE {qcol} IS NULL"
                     ).fetchone()[0]
                     results.append(
                         {"check": f"{column} NOT NULL", "passed": nulls == 0, "null_count": nulls}
                     )
                 elif check_type == "unique":
-                    total = con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-                    unique = con.execute(
-                        f"SELECT count(DISTINCT {column}) FROM {table}"
-                    ).fetchone()[0]
+                    total = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
+                    unique = con.execute(f"SELECT count(DISTINCT {qcol}) FROM {tref}").fetchone()[0]
                     results.append(
                         {
                             "check": f"{column} UNIQUE",
@@ -165,10 +172,11 @@ class DataPipelineAgent(BaseAgent):
         db_path = payload.get("db_path", ":memory:")
         try:
             con = get_duckdb_connection(db_path)
+            qtable = safe_table(table)
             if fmt == "parquet":
-                con.execute(f"COPY {table} TO '{output_path}' (FORMAT PARQUET)")
+                con.execute(f"COPY {qtable} TO ? (FORMAT PARQUET)", [output_path])
             else:
-                con.execute(f"COPY {table} TO '{output_path}' (FORMAT CSV, HEADER)")
+                con.execute(f"COPY {qtable} TO ? (FORMAT CSV, HEADER)", [output_path])
             con.close()
             return TaskResult(task_id=task_id, status="completed", output={"path": output_path})
         except Exception as e:

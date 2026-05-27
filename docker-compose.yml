@@ -1,5 +1,4 @@
 services:
-  ### Shared Infrastructure
   redis:
     image: redis:7-alpine
     container_name: agent-redis
@@ -12,7 +11,6 @@ services:
       timeout: 3s
       retries: 3
 
-  ### Multi-Agent Workers
   orchestrator:
     build: .
     container_name: agent-orchestrator
@@ -27,6 +25,12 @@ services:
     volumes:
       - ./src:/app/src
       - ./.env:/app/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   data-pipeline:
     build: .
@@ -39,10 +43,16 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - AGENT_ROLE=data-pipeline
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://prefect:password@host.docker.internal:5433/prefect}
+      - DATABASE_URL=${DATABASE_URL:-}
     volumes:
       - ./src:/app/src
       - ./.env:/app/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   analytics:
     build: .
@@ -57,6 +67,12 @@ services:
       - AGENT_ROLE=analytics
     volumes:
       - ./src:/app/src
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   code-gen:
     build: .
@@ -72,6 +88,12 @@ services:
     volumes:
       - ./src:/app/src
       - ./transform:/app/transform
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   reviewer:
     build: .
@@ -86,3 +108,9 @@ services:
       - AGENT_ROLE=reviewer
     volumes:
       - ./src:/app/src
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

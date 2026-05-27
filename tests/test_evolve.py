@@ -411,9 +411,7 @@ class TestEvolveApply:
         engine.harvest(str(project_dir))
         changes = engine.apply()
 
-        backup_exists = any(
-            c.backup_path and Path(c.backup_path).exists() for c in changes
-        )
+        backup_exists = any(c.backup_path and Path(c.backup_path).exists() for c in changes)
         assert backup_exists
 
 

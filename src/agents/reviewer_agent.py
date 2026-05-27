@@ -4,7 +4,13 @@ import os
 from src.agents.base import BaseAgent
 from src.schemas.messages import AgentMessage
 from src.schemas.tasks import Task, TaskResult
-from src.tools.database import get_duckdb_connection, get_postgres_engine
+from src.tools.database import (
+    get_duckdb_connection,
+    get_postgres_engine,
+    safe_column,
+    safe_layer,
+    safe_table,
+)
 
 
 class ReviewerAgent(BaseAgent):
@@ -84,16 +90,18 @@ class ReviewerAgent(BaseAgent):
                 actual_cols = {
                     r[0]: r[1]
                     for r in con.execute(
-                        f"SELECT column_name, data_type FROM information_schema.columns "
-                        f"WHERE table_name = '{table}' AND table_schema = '{layer}'"
+                        "SELECT column_name, data_type FROM information_schema.columns "
+                        "WHERE table_name = ? AND table_schema = ?",
+                        [table, layer],
                     ).fetchall()
                 }
                 con.close()
             else:
                 engine = get_postgres_engine()
                 result = engine.execute(
-                    f"SELECT column_name, data_type FROM information_schema.columns "
-                    f"WHERE table_name = '{table}'"
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    "WHERE table_name = %s",
+                    [table],
                 ).fetchall()
                 actual_cols = {r[0]: r[1] for r in result}
 
@@ -133,22 +141,23 @@ class ReviewerAgent(BaseAgent):
         issues = []
         try:
             con = get_duckdb_connection(db_path)
-            count = con.execute(f"SELECT count(*) FROM {layer}.{table}").fetchone()[0]
+            tref = f"{safe_layer(layer)}.{safe_table(table)}"
+            count = con.execute(f"SELECT count(*) FROM {tref}").fetchone()[0]
             cols = con.execute(
-                f"SELECT column_name, data_type FROM information_schema.columns "
-                f"WHERE table_name = '{table}' AND table_schema = '{layer}'"
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name = ? AND table_schema = ?",
+                [table, layer],
             ).fetchall()
             for col, dtype in cols:
-                nulls = con.execute(
-                    f"SELECT count(*) FROM {layer}.{table} WHERE {col} IS NULL"
-                ).fetchone()[0]
+                qcol = safe_column(col)
+                nulls = con.execute(f"SELECT count(*) FROM {tref} WHERE {qcol} IS NULL").fetchone()[
+                    0
+                ]
                 if nulls == count:
                     issues.append(
                         {"severity": "warning", "column": col, "message": "All values are NULL"}
                     )
-                unique = con.execute(
-                    f"SELECT count(DISTINCT {col}) FROM {layer}.{table}"
-                ).fetchone()[0]
+                unique = con.execute(f"SELECT count(DISTINCT {qcol}) FROM {tref}").fetchone()[0]
                 if unique == 1 and count > 1:
                     issues.append(
                         {

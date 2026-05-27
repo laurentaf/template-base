@@ -1,9 +1,16 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ProjectName,
-    [string]$TemplatePath = "E:\projects\template-base",
-    [string]$ProjectsRoot = "E:\projects"
+    [string]$TemplatePath = "",
+    [string]$ProjectsRoot = ""
 )
+
+if (-not $TemplatePath) {
+    $TemplatePath = Split-Path -Parent $PSScriptRoot
+}
+if (-not $ProjectsRoot) {
+    $ProjectsRoot = Split-Path -Parent $TemplatePath
+}
 
 $Destination = Join-Path $ProjectsRoot $ProjectName
 

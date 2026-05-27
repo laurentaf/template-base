@@ -31,7 +31,7 @@ class HealthChecker:
         },
         "PostgreSQL": {
             "url_env": "DATABASE_URL",
-            "default": "postgresql+psycopg://prefect:password@localhost:5433/prefect",
+            "default": "",
             "check": "postgres",
         },
         "Phoenix": {
@@ -64,30 +64,31 @@ class HealthChecker:
             if info["check"] == "redis":
                 ok = await check_redis(url)
                 results[name] = {
-            "url": url,
-            "status": "OK" if ok else "DOWN",
-            "required": name == "Redis",
-        }
+                    "url": url,
+                    "status": "OK" if ok else "DOWN",
+                    "required": name == "Redis",
+                }
             elif info["check"] == "http":
                 ok = await HealthChecker._check_http(url)
                 results[name] = {
-            "url": url,
-            "status": "OK" if ok else "DOWN",
-            "required": False,
-        }
+                    "url": url,
+                    "status": "OK" if ok else "DOWN",
+                    "required": False,
+                }
             elif info["check"] == "postgres":
                 ok = await HealthChecker._check_postgres(url)
                 results[name] = {
-            "url": "***" if ok else url,
-            "status": "OK" if ok else "DOWN",
-            "required": False,
-        }
+                    "url": "***" if ok else url,
+                    "status": "OK" if ok else "DOWN",
+                    "required": False,
+                }
         return results
 
     @staticmethod
     async def _check_http(url: str) -> bool:
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(url.split("/v1/")[0] if "/v1/" in url else url)
                 return resp.status_code < 500
@@ -98,6 +99,7 @@ class HealthChecker:
     async def _check_postgres(url: str) -> bool:
         try:
             import psycopg
+
             conn = psycopg.connect(url, connect_timeout=3)
             conn.close()
             return True
@@ -132,6 +134,37 @@ class AgentManager:
         "reviewer": "src.agents.reviewer_agent",
     }
     _processes: list[subprocess.Popen] = []
+    _pid_dir = Path.home() / ".ltade" / "agents"
+
+    @classmethod
+    def _save_pids(cls):
+        cls._pid_dir.mkdir(parents=True, exist_ok=True)
+        pid_file = cls._pid_dir / "pids.json"
+        pids = [
+            {"pid": p.pid, "module": m} for p, m in zip(cls._processes, cls.AGENT_MODULES.values())
+        ]
+        pid_file.write_text(json.dumps(pids))
+
+    @classmethod
+    def _cleanup_stale_pids(cls):
+        pid_file = cls._pid_dir / "pids.json"
+        if not pid_file.exists():
+            return
+        try:
+            pids = json.loads(pid_file.read_text())
+            for entry in pids:
+                try:
+                    proc = subprocess.Popen(
+                        ["tasklist", "/FI", f"PID eq {entry['pid']}"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+            pid_file.unlink()
+        except Exception:
+            pass
 
     @staticmethod
     async def start_agents(types_str: str = "all", mode: str = "auto"):
@@ -139,10 +172,8 @@ class AgentManager:
             types = AgentManager.AGENT_TYPES
         else:
             types = [
-            t.strip()
-            for t in types_str.split(",")
-            if t.strip() in AgentManager.AGENT_TYPES
-        ]
+                t.strip() for t in types_str.split(",") if t.strip() in AgentManager.AGENT_TYPES
+            ]
 
         print(f"\n=== Starting Agents (mode={mode}) ===\n")
         for agent_type in types:
@@ -150,16 +181,17 @@ class AgentManager:
             if not module:
                 print(f"  Unknown agent type: {agent_type}")
                 continue
-            try:
-                proc = subprocess.Popen(
-                    ["python", "-m", module],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                AgentManager._processes.append(proc)
-                print(f"  Started {agent_type} (PID {proc.pid})")
-            except Exception as e:
-                print(f"  Failed to start {agent_type}: {e}")
+        try:
+            proc = subprocess.Popen(
+                ["python", "-m", module],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            AgentManager._processes.append(proc)
+            print(f" Started {agent_type} (PID {proc.pid})")
+            AgentManager._save_pids()
+        except Exception as e:
+            print(f"  Failed to start {agent_type}: {e}")
 
         print(f"\n{len(AgentManager._processes)} agents running. Press Ctrl+C to stop.")
         try:
@@ -178,6 +210,7 @@ class AgentManager:
             except Exception:
                 proc.kill()
         AgentManager._processes.clear()
+        AgentManager._cleanup_stale_pids()
         print("All agents stopped.")
 
     @staticmethod
@@ -192,6 +225,7 @@ class AgentManager:
 
         try:
             from src.core.agent_registry import AgentRegistry
+
             registry = AgentRegistry()
             await registry.connect()
             agents = await registry.discover()
@@ -316,7 +350,7 @@ class BootstrapEngine:
     def _create_template_info(self):
         from src.core.template_sync import get_git_commit, save_template_info, scan_template
 
-        template_root = "E:\\projects\\template-base"
+        template_root = settings.template_path
         try:
             files = scan_template(template_root)
             commit = get_git_commit(template_root)
