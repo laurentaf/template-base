@@ -7,7 +7,20 @@ on:
     branches: [main]
 
 jobs:
+  structure-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Verify required files and directories
+      run: |
+        test -f AGENT_SYSTEM.md || (echo "FAIL: AGENT_SYSTEM.md missing" && exit 1)
+        test -d spec || (echo "FAIL: spec/ missing" && exit 1)
+        test -d evals || (echo "FAIL: evals/ missing" && exit 1)
+        test -d decisions || (echo "FAIL: decisions/ missing" && exit 1)
+        test -f MEMORY.md || (echo "FAIL: MEMORY.md missing" && exit 1)
+        echo "All required structure present."
   lint-test:
+    needs: structure-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

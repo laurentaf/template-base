@@ -318,6 +318,15 @@ class BootstrapEngine:
             if modified:
                 fpath.write_text(content, encoding="utf-8")
 
+    def _ensure_required_files(self):
+        agent_system = self.root / "AGENT_SYSTEM.md"
+        if not agent_system.exists():
+            raise FileNotFoundError(
+                "AGENT_SYSTEM.md is MISSING from project root. "
+                "This file is mandatory. Bootstrap refused. "
+                "Copy it from the template or create it before re-running."
+            )
+
     def _create_directories(self):
         for dir_path in self.DIRS_TO_CREATE:
             full = self.root / dir_path
@@ -412,7 +421,10 @@ class BootstrapEngine:
 
         print(f"\n=== Bootstrapping: {project_name} ===\n")
 
-        print("  Substituting template variables...")
+        print(" Checking required files...")
+        self._ensure_required_files()
+
+        print(" Substituting template variables...")
         self._substitute_template_vars(project_name)
 
         print("  Creating directories...")

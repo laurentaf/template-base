@@ -25,6 +25,11 @@ Get-ChildItem -Path $TemplatePath -Force | Copy-Item -Destination $Destination -
 
 Set-Location $Destination
 
+if (-not (Test-Path "$Destination\AGENT_SYSTEM.md")) {
+  Write-Host "ERROR: AGENT_SYSTEM.md missing from scaffold. This file is mandatory." -ForegroundColor Red
+  exit 1
+}
+
 Write-Host "[2/5] Initializing Python environment (uv)..." -ForegroundColor Cyan
 uv venv
 uv sync

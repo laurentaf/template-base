@@ -17,6 +17,11 @@ cp -r "$TEMPLATE_PATH/"* "$DEST/" 2>/dev/null || true
 cp -r "$TEMPLATE_PATH"/.* "$DEST/" 2>/dev/null || true
 cd "$DEST"
 
+if [ ! -f "AGENT_SYSTEM.md" ]; then
+  echo "ERROR: AGENT_SYSTEM.md missing from scaffold. This file is mandatory."
+  exit 1
+fi
+
 echo "[2/5] Initializing Python environment (uv)..."
 uv venv
 uv sync
